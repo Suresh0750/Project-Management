@@ -4,17 +4,32 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "prisma skills sync || exit 0",
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "prisma generate --config prisma/prisma.config.ts",
+    "db:format": "prisma format --config prisma/prisma.config.ts",
+    "db:validate": "prisma validate --config prisma/prisma.config.ts",
+    "db:migrate": "prisma migrate dev --config prisma/prisma.config.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --config prisma/prisma.config.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
     "express": "^5.3.0",
+    "express-rate-limit": "^8.7.2",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.24.6"
   },
@@ -24,7 +39,8 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
-    "prisma": "^8.0.0-rc.28",
+    "prettier": "^3.9.10",
+    "prisma": "^7.10.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
