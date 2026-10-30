@@ -5,6 +5,8 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { corsOptions } from './config/cors.js';
 import { success } from './utils/apiResponse.js';
+import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import { requestId } from './middlewares/requestId.js';
 
 export function createApp() {
   const app = express();
@@ -12,6 +14,8 @@ export function createApp() {
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
 
+  app.use(requestId);
+  
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -42,6 +46,9 @@ export function createApp() {
       ),
     );
   });
+  
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }
