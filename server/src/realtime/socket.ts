@@ -140,3 +140,8 @@ export function joinProjectRoom(userId: string, projectId: string): void {
 export function leaveProjectRoom(userId: string, projectId: string): void {
   io?.in(userRoom(userId)).socketsLeave(projectRoom(projectId));
 }
+
+/** Ends every live connection of a user (e.g. after their sessions were revoked). */
+export function disconnectUserSockets(userId: string): void {
+  io?.in(userRoom(userId)).disconnectSockets(true);
+}
