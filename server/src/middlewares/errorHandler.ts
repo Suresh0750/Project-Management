@@ -32,8 +32,24 @@ export function errorHandler(
     return;
   }
 
+  // body-parser errors (malformed JSON, payload too large) carry a 4xx status
+  if (isBodyParserError(err)) {
+    res
+      .status(err.status)
+      .json(failure(err.status === 413 ? 'Payload too large' : 'Invalid request body'));
+    return;
+  }
+
   const message = err instanceof Error ? err.message : 'Internal server error';
   const exposedMessage = env.NODE_ENV === 'production' ? 'Internal server error' : message;
 
   res.status(500).json(failure(exposedMessage));
+}
+
+function isBodyParserError(err: unknown): err is { status: number } {
+  if (typeof err !== 'object' || err === null || !('status' in err) || !('type' in err)) {
+    return false;
+  }
+  const { status } = err as { status: unknown };
+  return typeof status === 'number' && status >= 400 && status < 500;
 }

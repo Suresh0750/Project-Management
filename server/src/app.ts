@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -6,7 +7,12 @@ import helmet from 'helmet';
 import { corsOptions } from './config/cors.js';
 import { success } from './utils/apiResponse.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import { csrfProtection } from './middlewares/csrf.js';
 import { requestId } from './middlewares/requestId.js';
+
+// Route modules
+import authRoutes from './modules/auth/auth.routes.js';
+import usersRoutes from './modules/users/users.routes.js';
 
 export function createApp() {
   const app = express();
@@ -15,7 +21,7 @@ export function createApp() {
   app.set('trust proxy', 1);
 
   app.use(requestId);
-  
+
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -25,28 +31,32 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: false }));
   app.use(cookieParser());
+  app.use(csrfProtection);
 
+  // Global rate limiter
   const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 300,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
   });
-
   app.use('/api', globalLimiter);
 
+  //  Health check
   app.get('/api/health', (_req, res) => {
     res.json(
       success(
-        {
-          status: 'ok',
-          service: 'project-management-api',
-        },
+        { status: 'ok', service: 'project-management-api' },
         'API is healthy',
       ),
     );
   });
-  
+
+  // API routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/users', usersRoutes);
+
+  // Error handlers
   app.use(notFoundHandler);
   app.use(errorHandler);
 
