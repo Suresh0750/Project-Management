@@ -36,3 +36,56 @@ export const resetPasswordSchema = z
 export type LoginValues = z.infer<typeof loginSchema>;
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+
+const personName = z
+  .string()
+  .trim()
+  .min(2, 'Name must be at least 2 characters')
+  .max(100, 'Name must be at most 100 characters');
+
+/** The current password is only needed when the email address actually changes. */
+export function profileSchema(originalEmail: string) {
+  return z
+    .object({
+      name: personName,
+      email: z
+        .string()
+        .trim()
+        .min(1, 'Email is required')
+        .max(254, 'Email must be at most 254 characters')
+        .pipe(z.email('Enter a valid email address')),
+      currentPassword: z.string(),
+    })
+    .superRefine((values, ctx) => {
+      const changed = values.email.trim().toLowerCase() !== originalEmail.toLowerCase();
+      if (changed && !values.currentPassword) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['currentPassword'],
+          message: 'Enter your current password to change your email',
+        });
+      }
+    });
+}
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: passwordPolicy,
+    confirmPassword: z.string().min(1, 'Confirm your new password'),
+  })
+  .superRefine((values, ctx) => {
+    if (values.confirmPassword && values.newPassword !== values.confirmPassword) {
+      ctx.addIssue({ code: 'custom', path: ['confirmPassword'], message: 'Passwords do not match' });
+    }
+    if (values.newPassword && values.newPassword === values.currentPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['newPassword'],
+        message: 'New password must be different from the current password',
+      });
+    }
+  });
+
+export type ProfileValues = z.infer<ReturnType<typeof profileSchema>>;
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;

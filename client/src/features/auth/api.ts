@@ -27,3 +27,22 @@ export async function forgotPassword(email: string): Promise<void> {
 export async function resetPassword(token: string, password: string): Promise<void> {
   await apiClient.post('/auth/reset-password', { token, password });
 }
+
+export interface UpdateProfilePayload {
+  name?: string;
+  email?: string;
+  currentPassword?: string;
+}
+
+export async function updateProfile(payload: UpdateProfilePayload): Promise<AuthUser> {
+  const { data } = await apiClient.patch<ApiSuccess<AuthUserPayload>>('/auth/profile', payload);
+  return data.data.user;
+}
+
+export async function changePassword(payload: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<AuthUser> {
+  const { data } = await apiClient.patch<ApiSuccess<AuthUserPayload>>('/auth/password', payload);
+  return data.data.user;
+}
