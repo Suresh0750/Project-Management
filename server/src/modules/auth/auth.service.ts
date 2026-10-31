@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { Role } from '@prisma/client';
+import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
 import { HttpError } from '../../utils/httpError.js';
 import {
@@ -9,7 +9,12 @@ import {
   verifyRefreshToken,
 } from '../../utils/jwt.js';
 import { SAFE_USER_SELECT } from '../../constants.js';
-import type { RegisterInput, LoginInput } from './auth.validation.js';
+import type {
+  ChangePasswordInput,
+  LoginInput,
+  RegisterInput,
+  UpdateProfileInput,
+} from './auth.validation.js';
 
 const SALT_ROUNDS = 12;
 // Real bcrypt hash so unknown-email logins cost the same as wrong-password ones
@@ -154,4 +159,84 @@ export async function getMe(userId: string) {
   if (!user.isActive) throw new HttpError(403, 'Account is deactivated');
 
   return user;
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+// A wrong current password is a 400 (not 401): a 401 means "session expired" to the client
+// and would sign the user out for a simple typo.
+function wrongPassword(): HttpError {
+  const message = 'Current password is incorrect';
+  return new HttpError(400, message, [{ path: 'currentPassword', message }]);
+}
+
+export async function updateProfile(userId: string, input: UpdateProfileInput) {
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, passwordHash: true },
+  });
+  if (!current) throw new HttpError(404, 'User not found');
+
+  const emailChanged = input.email !== undefined && input.email !== current.email;
+  if (emailChanged) {
+    if (!input.currentPassword) {
+      const message = 'Enter your current password to change your email';
+      throw new HttpError(400, message, [{ path: 'currentPassword', message }]);
+    }
+    if (!(await bcrypt.compare(input.currentPassword, current.passwordHash))) throw wrongPassword();
+
+    const taken = await prisma.user.findFirst({
+      where: { email: input.email as string, NOT: { id: userId } },
+      select: { id: true },
+    });
+    if (taken) {
+      const message = 'Email address is already in use';
+      throw new HttpError(409, message, [{ path: 'email', message }]);
+    }
+  }
+
+  const data: Prisma.UserUpdateInput = {};
+  if (input.name !== undefined) data.name = input.name;
+  if (emailChanged && input.email !== undefined) data.email = input.email;
+
+  try {
+    return await prisma.user.update({ where: { id: userId }, data, select: SAFE_USER_SELECT });
+  } catch (err) {
+    // Two concurrent requests can both pass the check above; the unique index decides.
+    if (typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002') {
+      const message = 'Email address is already in use';
+      throw new HttpError(409, message, [{ path: 'email', message }]);
+    }
+    throw err;
+  }
+}
+
+// ─── Change password ──────────────────────────────────────────────────────────
+// Bumping tokenVersion signs the user out everywhere else; the caller gets fresh tokens so
+// the current session stays signed in.
+export async function changePassword(userId: string, input: ChangePasswordInput) {
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true },
+  });
+  if (!current) throw new HttpError(404, 'User not found');
+
+  if (!(await bcrypt.compare(input.currentPassword, current.passwordHash))) throw wrongPassword();
+
+  const passwordHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, tokenVersion: { increment: 1 } },
+    select: { ...SAFE_USER_SELECT, tokenVersion: true },
+  });
+
+  const { tokenVersion, ...user } = updated;
+  const accessToken = signAccessToken({
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+    tokenVersion,
+  });
+  const refreshToken = signRefreshToken(user.id, tokenVersion);
+
+  return { user, accessToken, refreshToken };
 }

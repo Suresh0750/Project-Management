@@ -3,7 +3,12 @@ import rateLimit from 'express-rate-limit';
 import { authenticate } from '../../middlewares/authenticate.js';
 import { validate } from '../../middlewares/validate.js';
 import * as authController from './auth.controller.js';
-import { loginSchema, registerSchema } from './auth.validation.js';
+import {
+  changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  updateProfileSchema,
+} from './auth.validation.js';
 
 const router = Router();
 
@@ -30,5 +35,17 @@ router.post('/refresh', authController.refreshTokens);
 
 // GET /api/auth/me  (authenticated)
 router.get('/me', authenticate, authController.me);
+
+// PATCH /api/auth/profile  (authenticated; name, and email with the current password)
+router.patch('/profile', authenticate, validate(updateProfileSchema), authController.updateProfile);
+
+// PATCH /api/auth/password  (authenticated; rate limited like login to slow password guessing)
+router.patch(
+  '/password',
+  authLimiter,
+  authenticate,
+  validate(changePasswordSchema),
+  authController.changePassword,
+);
 
 export default router;

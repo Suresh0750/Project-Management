@@ -4,7 +4,13 @@ import { clearAuthCookies, setAuthCookies } from '../../utils/cookies.js';
 import { HttpError } from '../../utils/httpError.js';
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '../../constants.js';
 import * as authService from './auth.service.js';
-import type { LoginInput, RegisterInput } from './auth.validation.js';
+import { disconnectUserSockets } from '../../realtime/socket.js';
+import type {
+  ChangePasswordInput,
+  LoginInput,
+  RegisterInput,
+  UpdateProfileInput,
+} from './auth.validation.js';
 
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -62,6 +68,30 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
     // req.user is set by authenticate middleware
     const user = await authService.getMe(req.user!.id);
     res.status(200).json(success({ user }, 'User fetched successfully'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await authService.updateProfile(req.user!.id, req.body as UpdateProfileInput);
+    res.status(200).json(success({ user }, 'Profile updated successfully'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { user, accessToken, refreshToken } = await authService.changePassword(
+      req.user!.id,
+      req.body as ChangePasswordInput,
+    );
+    setAuthCookies(res, accessToken, refreshToken);
+    // Other devices were just signed out; end their live connections too.
+    disconnectUserSockets(user.id);
+    res.status(200).json(success({ user }, 'Password updated successfully'));
   } catch (err) {
     next(err);
   }

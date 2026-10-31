@@ -6,6 +6,7 @@ import { LayoutDashboard, Menu } from 'lucide-react';
 import { NotificationDropdown } from '@/components/notifications/notification-dropdown';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 import { MobileSidebar } from '@/components/layout/mobile-sidebar';
+import { ProfileMenu } from '@/components/layout/profile-menu';
 import { useLogout } from '@/features/auth/hooks';
 import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed';
 import { disconnectSocket } from '@/lib/socket/client';
@@ -60,8 +61,9 @@ export function AppShell({ user, children }: { user: AuthUser; children: ReactNo
             <LayoutDashboard className="size-4" aria-hidden="true" />
           </span>
           <span className="font-semibold tracking-tight md:hidden">ProjectFlow</span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
             <NotificationDropdown role={user.role} />
+            <ProfileMenu user={user} onLogout={handleLogout} loggingOut={logout.isPending} />
           </div>
         </header>
 

@@ -1,7 +1,16 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { forgotPassword, getMe, login, logout, resetPassword } from '@/features/auth/api';
+import {
+  changePassword,
+  forgotPassword,
+  getMe,
+  login,
+  logout,
+  resetPassword,
+  updateProfile,
+  type UpdateProfilePayload,
+} from '@/features/auth/api';
 import type { ApiError } from '@/lib/api/errors';
 import type { AuthUser } from '@/types/auth';
 import type { LoginValues } from '@/schemas/auth';
@@ -46,5 +55,22 @@ export function useForgotPassword() {
 export function useResetPassword() {
   return useMutation<void, ApiError, { token: string; password: string }>({
     mutationFn: ({ token, password }) => resetPassword(token, password),
+  });
+}
+
+/** Keep the signed-in user in the session cache so the name updates everywhere at once. */
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation<AuthUser, ApiError, UpdateProfilePayload>({
+    mutationFn: updateProfile,
+    onSuccess: (user) => queryClient.setQueryData(SESSION_QUERY_KEY, user),
+  });
+}
+
+export function useChangePassword() {
+  const queryClient = useQueryClient();
+  return useMutation<AuthUser, ApiError, { currentPassword: string; newPassword: string }>({
+    mutationFn: changePassword,
+    onSuccess: (user) => queryClient.setQueryData(SESSION_QUERY_KEY, user),
   });
 }
