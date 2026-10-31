@@ -1,18 +1,22 @@
 import 'dotenv/config';
-import './config/env.js'; // validate env vars at startup — exits if invalid
-import http from 'node:http';
+import './config/env.js';
+
 import { createApp } from './app.js';
-
-const env = process.env;
 const app = createApp();
-const server = http.createServer(app);
 
-server.listen(env.PORT, () => {
-  console.info(`API listening on http://localhost:${String(env.PORT)} (${String(env.NODE_ENV)})`);
+const PORT = process.env.PORT || 3000;
+
+const server = app.listen(PORT, () => {
+  console.info(
+    `API listening on http://localhost:${PORT} (${process.env.NODE_ENV})`
+  );
 });
 
 const shutdown = (): void => {
+  console.info('Shutting down server...');
+
   server.close(() => {
+    console.info('Server closed successfully');
     process.exit(0);
   });
 };
