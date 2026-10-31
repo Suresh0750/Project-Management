@@ -99,6 +99,16 @@ export function TaskForm({
 
   const submit = handleSubmit(async (values) => {
     setFormError(null);
+
+    // if (
+    //   isCreate &&
+    //   values.assigneeId &&
+    //   !assigneeOptions.some((option) => option.value === values.assigneeId) || !values.assigneeId
+    // ) {
+    //   setError('assigneeId', { message: 'Select an active member of this project' });
+    //   return;
+    // }
+
     try {
       await onSubmit(values);
       reset(isCreate ? undefined : values);
@@ -155,7 +165,11 @@ export function TaskForm({
             placeholder={assigneePlaceholder}
             options={assigneeOptions}
             disabled={!projectId || project.isPending}
-            hint="Only active members of the project can be assigned."
+            hint={
+              projectId && project.data && assigneeOptions.length === 0
+                ? 'This project has no active members yet. Add members to the project to assign tasks.'
+                : 'Only active members of the project can be assigned.'
+            }
             error={errors.assigneeId?.message ?? (project.isError ? project.error.message : undefined)}
             {...register('assigneeId')}
           />
