@@ -31,18 +31,20 @@ export const projectsKeys = {
   activities: (id: string, page: number) => ['projects', 'activities', id, page] as const,
 };
 
-export function useProjects(params: ListProjectsParams) {
+export function useProjects(params: ListProjectsParams, enabled = true) {
   return useQuery({
     queryKey: projectsKeys.list(params),
     queryFn: ({ signal }) => listProjects(params, signal),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
-export function useProject(id: string) {
+export function useProject(id: string, enabled = true) {
   return useQuery<ProjectDetail, ApiError>({
     queryKey: projectsKeys.detail(id),
     queryFn: ({ signal }) => getProject(id, signal),
+    enabled,
   });
 }
 
