@@ -17,6 +17,7 @@ import projectsRoutes from './modules/projects/projects.routes.js';
 import tasksRoutes from './modules/tasks/tasks.routes.js';
 import activityRoutes from './modules/activity/activity.routes.js';
 import notificationRoutes from './modules/notifications/notification.routes.js';
+import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 
 export function createApp() {
   const app = express();
@@ -63,6 +64,7 @@ export function createApp() {
   app.use('/api/tasks', tasksRoutes);
   app.use('/api/activities', activityRoutes);
   app.use('/api/notifications', notificationRoutes);
+  app.use('/api/dashboard', dashboardRoutes);
 
   // Error handlers
   app.use(notFoundHandler);
