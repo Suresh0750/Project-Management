@@ -1,17 +1,22 @@
 'use client';
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { listActivities, type ListActivitiesParams } from '@/features/activity/api';
 
+export type ActivityFeedParams = Omit<ListActivitiesParams, 'page'>;
+
 export const activityKeys = {
-  list: (params: ListActivitiesParams) => ['activities', 'list', params] as const,
+  feed: (params: ActivityFeedParams) => ['activities', 'feed', params] as const,
 };
 
-export function useActivities(params: ListActivitiesParams, enabled = true) {
-  return useQuery({
-    queryKey: activityKeys.list(params),
-    queryFn: ({ signal }) => listActivities(params, signal),
-    placeholderData: keepPreviousData,
+/** Newest-first feed that loads one page at a time as the reader scrolls. */
+export function useActivityFeed(params: ActivityFeedParams, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: activityKeys.feed(params),
+    queryFn: ({ pageParam, signal }) => listActivities({ ...params, page: pageParam }, signal),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.meta.page < lastPage.meta.totalPages ? lastPage.meta.page + 1 : undefined,
     enabled,
   });
 }
