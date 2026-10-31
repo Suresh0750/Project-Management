@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert } from '@/components/ui/alert';
@@ -55,6 +55,7 @@ export function ProjectForm({
     handleSubmit,
     setError,
     control,
+    reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectFormSchema(Boolean(managerField))) as Resolver<ProjectFormValues>,
@@ -73,10 +74,22 @@ export function ProjectForm({
 
   const startDate = useWatch({ control, name: 'startDate' });
 
+  // Cache Components can keep a page alive in the background after navigating away, so
+  // discard entered data whenever the form goes away.
+  useEffect(
+    () => () => {
+      reset();
+      setFormError(null);
+    },
+    [reset],
+  );
+
   const submit = handleSubmit(async (values) => {
     setFormError(null);
     try {
       await onSubmit(values);
+      // Create: back to a blank form. Edit: the saved values become the new baseline.
+      reset(defaultValues ? values : undefined);
     } catch (error) {
       if (!(error instanceof ApiError)) {
         setFormError('Unexpected error. Please try again.');
