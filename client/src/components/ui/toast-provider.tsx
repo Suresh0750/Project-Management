@@ -9,10 +9,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { CircleAlert, CircleCheck, X } from 'lucide-react';
+import { Bell, CircleAlert, CircleCheck, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
-type ToastTone = 'success' | 'error';
+type ToastTone = 'success' | 'error' | 'info';
 
 interface ToastItem {
   id: number;
@@ -23,6 +23,7 @@ interface ToastItem {
 interface ToastApi {
   success: (message: string) => void;
   error: (message: string) => void;
+  info: (message: string) => void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -46,7 +47,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   const api = useMemo<ToastApi>(
-    () => ({ success: (m) => push('success', m), error: (m) => push('error', m) }),
+    () => ({
+      success: (m) => push('success', m),
+      error: (m) => push('error', m),
+      info: (m) => push('info', m),
+    }),
     [push],
   );
 
@@ -58,15 +63,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-end gap-2"
       >
         {toasts.map((toast) => {
-          const Icon = toast.tone === 'success' ? CircleCheck : CircleAlert;
+          const Icon =
+            toast.tone === 'success' ? CircleCheck : toast.tone === 'info' ? Bell : CircleAlert;
           return (
             <div
               key={toast.id}
               className={cn(
                 'pointer-events-auto flex w-full max-w-sm items-start gap-2 rounded-lg border bg-surface px-3 py-2.5 text-sm shadow-md',
-                toast.tone === 'success'
-                  ? 'border-success-border text-success'
-                  : 'border-danger-border text-danger',
+                toast.tone === 'success' && 'border-success-border text-success',
+                toast.tone === 'error' && 'border-danger-border text-danger',
+                toast.tone === 'info' && 'border-info-border text-primary',
               )}
             >
               <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />

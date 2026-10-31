@@ -4,6 +4,7 @@ import { HttpError } from '../../utils/httpError.js';
 import type { AuthUser } from '../../types/express.js';
 import { recordActivity } from '../activity/activity.service.js';
 import { notifyUsers } from '../notifications/notification.service.js';
+import { Outbox } from '../../realtime/outbox.js';
 import { manages, permissionsFor, taskScope } from './tasks.access.js';
 import type {
   CreateTaskInput,
@@ -151,6 +152,7 @@ export async function getTask(user: AuthUser, id: string) {
 export async function createTask(user: AuthUser, input: CreateTaskInput) {
   const project = await findManageableProject(user, input.projectId);
   const assignee = input.assigneeId ? await assertValidAssignee(project.id, input.assigneeId) : null;
+  const outbox = new Outbox();
 
   const created = await prisma.$transaction(async (tx) => {
     const last = await tx.task.aggregate({
@@ -191,15 +193,19 @@ export async function createTask(user: AuthUser, input: CreateTaskInput) {
         taskId: task.id,
         metadata: { assigneeId: assignee.id },
       });
-      await notifyUsers(tx, [assignee.id], user.id, {
+      outbox.addNotifications(await notifyUsers(tx, [assignee.id], user.id, {
         type: 'TASK_ASSIGNED',
         message: `${user.name} assigned you the task "${input.title}"`,
         projectId: project.id,
         taskId: task.id,
-      });
+      }));
     }
     return task;
   });
+
+  outbox.addProjectEvent(project.id, 'task:created', { taskId: created.id });
+  if (assignee) outbox.addProjectEvent(project.id, 'task:assigned', { taskId: created.id });
+  outbox.flush();
 
   return getTask(user, created.id);
 }
@@ -224,6 +230,7 @@ export async function updateTask(user: AuthUser, id: string, input: UpdateTaskIn
   if (input.priority !== undefined) data.priority = input.priority;
   if (input.dueDate !== undefined) data.dueDate = input.dueDate;
 
+  const outbox = new Outbox();
   await prisma.$transaction(async (tx) => {
     await tx.task.update({ where: { id }, data });
     await recordActivity(tx, {
@@ -235,6 +242,8 @@ export async function updateTask(user: AuthUser, id: string, input: UpdateTaskIn
       metadata: { fields: Object.keys(data) },
     });
   });
+  outbox.addProjectEvent(task.projectId, 'task:updated', { taskId: id });
+  outbox.flush();
 
   return getTask(user, id);
 }
@@ -247,6 +256,7 @@ export async function updateTaskStatus(user: AuthUser, id: string, input: Update
     throw new HttpError(403, 'You do not have permission to change this task');
   }
 
+  const outbox = new Outbox();
   await prisma.$transaction(async (tx) => {
     const column = await tx.task.findMany({
       where: { projectId: task.projectId, status: input.status, deletedAt: null, id: { not: id } },
@@ -281,14 +291,16 @@ export async function updateTaskStatus(user: AuthUser, id: string, input: Update
         taskId: id,
         metadata: { from: task.status, to: input.status },
       });
-      await notifyUsers(tx, [task.assigneeId, task.creatorId], user.id, {
+      outbox.addNotifications(await notifyUsers(tx, [task.assigneeId, task.creatorId], user.id, {
         type: 'TASK_STATUS_CHANGED',
         message: `"${task.title}" moved to ${input.status}`,
         projectId: task.projectId,
         taskId: id,
-      });
+      }));
     }
   });
+  outbox.addProjectEvent(task.projectId, 'task:statusChanged', { taskId: id });
+  outbox.flush();
 
   return getTask(user, id);
 }
@@ -303,6 +315,7 @@ export async function assignTask(user: AuthUser, id: string, assigneeId: string 
   if (assigneeId === task.assigneeId) return toTask(user, task);
 
   const assignee = assigneeId ? await assertValidAssignee(task.projectId, assigneeId) : null;
+  const outbox = new Outbox();
 
   await prisma.$transaction(async (tx) => {
     await tx.task.update({
@@ -320,14 +333,16 @@ export async function assignTask(user: AuthUser, id: string, assigneeId: string 
       metadata: { assigneeId: assignee?.id ?? null },
     });
     if (assignee) {
-      await notifyUsers(tx, [assignee.id], user.id, {
+      outbox.addNotifications(await notifyUsers(tx, [assignee.id], user.id, {
         type: 'TASK_ASSIGNED',
         message: `${user.name} assigned you the task "${task.title}"`,
         projectId: task.projectId,
         taskId: id,
-      });
+      }));
     }
   });
+  outbox.addProjectEvent(task.projectId, 'task:assigned', { taskId: id });
+  outbox.flush();
 
   return getTask(user, id);
 }
@@ -350,6 +365,10 @@ export async function deleteTask(user: AuthUser, id: string): Promise<void> {
       taskId: id,
     });
   });
+
+  const outbox = new Outbox();
+  outbox.addProjectEvent(task.projectId, 'task:updated', { taskId: id, deleted: true });
+  outbox.flush();
 }
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
@@ -374,7 +393,8 @@ export async function addComment(user: AuthUser, taskId: string, content: string
   const task = await findAccessible(user, taskId);
   assertWritable(task);
 
-  return prisma.$transaction(async (tx) => {
+  const outbox = new Outbox();
+  const comment = await prisma.$transaction(async (tx) => {
     const comment = await tx.comment.create({
       data: { taskId, authorId: user.id, content },
       select: commentSelect,
@@ -386,14 +406,18 @@ export async function addComment(user: AuthUser, taskId: string, content: string
       projectId: task.projectId,
       taskId,
     });
-    await notifyUsers(tx, [task.assigneeId, task.creatorId], user.id, {
+    outbox.addNotifications(await notifyUsers(tx, [task.assigneeId, task.creatorId], user.id, {
       type: 'TASK_COMMENT',
       message: `${user.name} commented on "${task.title}"`,
       projectId: task.projectId,
       taskId,
-    });
+    }));
     return comment;
   });
+
+  outbox.addProjectEvent(task.projectId, 'task:updated', { taskId });
+  outbox.flush();
+  return comment;
 }
 
 // ─── Activity timeline (chronological, immutable) ─────────────────────────────
