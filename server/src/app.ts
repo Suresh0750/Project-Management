@@ -14,6 +14,7 @@ import { requestId } from './middlewares/requestId.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
+import tasksRoutes from './modules/tasks/tasks.routes.js';
 
 export function createApp() {
   const app = express();
@@ -57,6 +58,7 @@ export function createApp() {
   app.use('/api/auth', authRoutes);
   app.use('/api/users', usersRoutes);
   app.use('/api/projects', projectsRoutes);
+  app.use('/api/tasks', tasksRoutes);
 
   // Error handlers
   app.use(notFoundHandler);
