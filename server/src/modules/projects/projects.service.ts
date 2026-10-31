@@ -3,7 +3,9 @@ import { prisma } from '../../../prisma/client.js';
 import { SAFE_USER_SELECT } from '../../constants.js';
 import { HttpError } from '../../utils/httpError.js';
 import type { AuthUser } from '../../types/express.js';
+import { Outbox } from '../../realtime/outbox.js';
 import { recordActivity } from '../activity/activity.service.js';
+import { notifyUsers } from '../notifications/notification.service.js';
 import {
   deadlineBeforeStart,
   type CreateProjectInput,
@@ -173,6 +175,7 @@ async function assertValidManager(managerId: string): Promise<void> {
 
 export async function createProject(user: AuthUser, input: CreateProjectInput) {
   const managerId = await resolveManagerId(user, input.managerId);
+  const outbox = new Outbox();
 
   const created = await prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
@@ -197,6 +200,10 @@ export async function createProject(user: AuthUser, input: CreateProjectInput) {
     });
     return project;
   });
+
+  outbox.addRoomJoin(managerId, created.id);
+  outbox.addProjectEvent(created.id, 'project:updated');
+  outbox.flush();
 
   return getProject(user, created.id);
 }
@@ -229,6 +236,7 @@ export async function updateProject(user: AuthUser, id: string, input: UpdatePro
   if (input.deadline !== undefined) data.deadline = input.deadline;
   if (input.managerId !== undefined) data.managerId = input.managerId;
 
+  const outbox = new Outbox();
   await prisma.$transaction(async (tx) => {
     await tx.project.update({ where: { id }, data });
     await recordActivity(tx, {
@@ -240,6 +248,13 @@ export async function updateProject(user: AuthUser, id: string, input: UpdatePro
     });
   });
 
+  if (input.managerId !== undefined && input.managerId !== project.managerId) {
+    outbox.addRoomJoin(input.managerId, id);
+    outbox.addRoomLeave(project.managerId, id);
+  }
+  outbox.addProjectEvent(id, 'project:updated');
+  outbox.flush();
+
   return getProject(user, id);
 }
 
@@ -248,6 +263,7 @@ export async function setProjectArchived(user: AuthUser, id: string, archived: b
   const project = await findManageable(user, id);
 
   if (Boolean(project.archivedAt) !== archived) {
+    const outbox = new Outbox();
     await prisma.$transaction(async (tx) => {
       await tx.project.update({ where: { id }, data: { archivedAt: archived ? new Date() : null } });
       await recordActivity(tx, {
@@ -257,6 +273,8 @@ export async function setProjectArchived(user: AuthUser, id: string, archived: b
         projectId: id,
       });
     });
+    outbox.addProjectEvent(id, 'project:updated');
+    outbox.flush();
   }
 
   return getProject(user, id);
@@ -275,6 +293,7 @@ export async function addMember(user: AuthUser, id: string, userId: string) {
     throw fieldError(400, 'userId', 'Only active Members can be added to a project');
   }
 
+  const outbox = new Outbox();
   try {
     await prisma.$transaction(async (tx) => {
       await tx.projectMember.create({ data: { projectId: id, userId, addedById: user.id } });
@@ -285,19 +304,22 @@ export async function addMember(user: AuthUser, id: string, userId: string) {
         projectId: id,
         metadata: { userId },
       });
-      await tx.notification.create({
-        data: {
+      outbox.addNotifications(
+        await notifyUsers(tx, [userId], user.id, {
           type: 'PROJECT_MEMBER_ADDED',
           message: `You were added to the project "${project.name}"`,
-          userId,
           projectId: id,
-        },
-      });
+        }),
+      );
     });
   } catch (err) {
     if (isUniqueViolation(err)) throw new HttpError(409, 'User is already a member of this project');
     throw err;
   }
+
+  outbox.addRoomJoin(userId, id);
+  outbox.addProjectEvent(id, 'project:memberAdded', { userId });
+  outbox.flush();
 
   return getProject(user, id);
 }
@@ -312,6 +334,7 @@ export async function removeMember(user: AuthUser, id: string, userId: string) {
   });
   if (!membership) throw new HttpError(404, 'This user is not a member of the project');
 
+  const outbox = new Outbox();
   await prisma.$transaction(async (tx) => {
     await tx.projectMember.delete({ where: { projectId_userId: { projectId: id, userId } } });
     // A removed member can no longer hold tasks in this project.
@@ -327,6 +350,11 @@ export async function removeMember(user: AuthUser, id: string, userId: string) {
       metadata: { userId },
     });
   });
+
+  // The removed user hears about it first, then stops receiving this project's events.
+  outbox.addProjectEvent(id, 'project:memberRemoved', { userId });
+  outbox.addRoomLeave(userId, id);
+  outbox.flush();
 
   return getProject(user, id);
 }

@@ -1,12 +1,17 @@
 import 'dotenv/config';
 import './config/env.js';
 
+import { createServer } from 'node:http';
 import { createApp } from './app.js';
+import { closeSocket, initSocket } from './realtime/socket.js';
+
 const app = createApp();
+const httpServer = createServer(app);
+initSocket(httpServer);
 
 const PORT = process.env.PORT || 3000;
 
-const server = app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.info(
     `API listening on http://localhost:${PORT} (${process.env.NODE_ENV})`
   );
@@ -15,9 +20,11 @@ const server = app.listen(PORT, () => {
 const shutdown = (): void => {
   console.info('Shutting down server...');
 
-  server.close(() => {
-    console.info('Server closed successfully');
-    process.exit(0);
+  void closeSocket().finally(() => {
+    httpServer.close(() => {
+      console.info('Server closed successfully');
+      process.exit(0);
+    });
   });
 };
 
