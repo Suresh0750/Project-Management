@@ -7,11 +7,9 @@ interface FilterDropdownProps {
   onChange: (value: string) => void;
   options: SelectOption[];
   allLabel: string;
-  /** Hide the "all" entry when a value is always required. */
   hideAll?: boolean;
 }
 
-/** Compact native select for list filters; the empty value means "no filter". */
 export function FilterDropdown({ label, value, onChange, options, allLabel, hideAll = false }: FilterDropdownProps) {
   return (
     <div className="relative">
