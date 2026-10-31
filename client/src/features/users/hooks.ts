@@ -26,11 +26,12 @@ export const usersKeys = {
   detail: (id: string) => ['users', 'detail', id] as const,
 };
 
-export function useUsers(params: ListUsersParams) {
+export function useUsers(params: ListUsersParams, enabled = true) {
   return useQuery({
     queryKey: usersKeys.list(params),
     queryFn: ({ signal }) => listUsers(params, signal),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
