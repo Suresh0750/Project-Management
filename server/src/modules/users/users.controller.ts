@@ -37,7 +37,11 @@ export async function createUser(req: Request, res: Response, next: NextFunction
 
 export async function updateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = await usersService.updateUser(req.params.id as string, req.body as UpdateUserInput);
+    const user = await usersService.updateUser(
+      req.params.id as string,
+      req.body as UpdateUserInput,
+      req.user!.id,
+    );
     res.status(200).json(success({ user }, 'User updated successfully'));
   } catch (err) {
     next(err);

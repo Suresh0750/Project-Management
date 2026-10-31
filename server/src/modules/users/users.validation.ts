@@ -1,6 +1,5 @@
 import { Role } from '@prisma/client';
 import { z } from 'zod';
-import { ASSIGNABLE_ROLES } from '../../constants.js';
 
 const passwordSchema = z
   .string()
@@ -11,32 +10,50 @@ const passwordSchema = z
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
 
+const nameSchema = z
+  .string()
+  .trim()
+  .min(2, 'Name must be at least 2 characters')
+  .max(100, 'Name must be at most 100 characters');
+
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(254, 'Email must be at most 254 characters')
+  .email('Invalid email address');
+
+// ADMIN accounts are provisioned through the seed, never through the API.
+const assignableRoleSchema = z.enum([Role.PROJECT_MANAGER, Role.MEMBER], {
+  message: 'Role must be one of: PROJECT_MANAGER, MEMBER',
+});
+
+const idParamSchema = z.object({
+  id: z.string().trim().min(1, 'User ID is required').max(64, 'Invalid user ID'),
+});
+
 export const createUserSchema = z.object({
   body: z.object({
-    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
-    email: z.string().trim().toLowerCase().email('Invalid email address'),
+    name: nameSchema,
+    email: emailSchema,
     password: passwordSchema,
-    role: z.enum(
-      ASSIGNABLE_ROLES as unknown as [string, ...string[]],
-      { message: `Role must be one of: ${ASSIGNABLE_ROLES.join(', ')}` },
-    ).transform((v) => v as typeof ASSIGNABLE_ROLES[number]),
+    role: assignableRoleSchema,
   }),
 });
 
 export const updateUserSchema = z.object({
-  params: z.object({
-    id: z.string().min(1, 'User ID is required'),
-  }),
-  body: z.object({
-    name: z.string().trim().min(2).max(100).optional(),
-    email: z.string().trim().toLowerCase().email().optional(),
-  }).refine((b) => Object.keys(b).length > 0, { message: 'At least one field is required' }),
+  params: idParamSchema,
+  body: z
+    .object({
+      name: nameSchema.optional(),
+      email: emailSchema.optional(),
+      role: assignableRoleSchema.optional(),
+    })
+    .refine((body) => Object.keys(body).length > 0, { message: 'At least one field is required' }),
 });
 
 export const updateUserStatusSchema = z.object({
-  params: z.object({
-    id: z.string().min(1, 'User ID is required'),
-  }),
+  params: idParamSchema,
   body: z.object({
     isActive: z.boolean({ message: 'isActive must be a boolean' }),
   }),
@@ -46,23 +63,17 @@ export const listUsersSchema = z.object({
   query: z.object({
     page: z.coerce.number().int().positive().default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
-    search: z.string().trim().optional(),
+    search: z.string().trim().max(100, 'Search must be at most 100 characters').optional(),
     role: z.nativeEnum(Role).optional(),
     isActive: z
-      .string()
+      .enum(['true', 'false'], { message: 'isActive must be "true" or "false"' })
       .optional()
-      .transform((v) => {
-        if (v === 'true') return true;
-        if (v === 'false') return false;
-        return undefined;
-      }),
+      .transform((value) => (value === undefined ? undefined : value === 'true')),
   }),
 });
 
 export const userIdParamSchema = z.object({
-  params: z.object({
-    id: z.string().min(1, 'User ID is required'),
-  }),
+  params: idParamSchema,
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>['body'];
