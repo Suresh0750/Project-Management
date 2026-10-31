@@ -1,26 +1,102 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f8ff;
+  --foreground: #0b1b3a;
+  --surface: #ffffff;
+  --surface-muted: #eaf1fd;
+  --border: #dbe6f7;
+  --border-strong: #bcd0ee;
+  --muted-foreground: #5b6b88;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --danger-border: #fecaca;
+  --success: #16a34a;
+  --success-soft: #f0fdf4;
+  --success-border: #bbf7d0;
+  --info-soft: #eff6ff;
+  --info-border: #bfdbfe;
+  --ring: #3b82f6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --background: #0a1226;
+    --foreground: #e5e7eb;
+    --surface: #0f1a33;
+    --surface-muted: #172447;
+    --border: #1e2d52;
+    --border-strong: #374151;
+    --muted-foreground: #9ca3af;
+    --primary: #3b82f6;
+    --primary-hover: #60a5fa;
+    --danger: #f87171;
+    --danger-soft: #2a1215;
+    --danger-border: #7f1d1d;
+    --success: #4ade80;
+    --success-soft: #0f2418;
+    --success-border: #14532d;
+    --info-soft: #0f1f3d;
+    --info-border: #1e40af;
+    --ring: #60a5fa;
+  }
+}
+
+:root[data-theme='dark'] {
+  --background: #0a1226;
+  --foreground: #e5e7eb;
+  --surface: #0f1a33;
+  --surface-muted: #172447;
+  --border: #1e2d52;
+  --border-strong: #374151;
+  --muted-foreground: #9ca3af;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --danger: #f87171;
+  --danger-soft: #2a1215;
+  --danger-border: #7f1d1d;
+  --success: #4ade80;
+  --success-soft: #0f2418;
+  --success-border: #14532d;
+  --info-soft: #0f1f3d;
+  --info-border: #1e40af;
+  --ring: #60a5fa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-border: var(--danger-border);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+  --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
