@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Copy, Wand2 } from 'lucide-react';
@@ -51,6 +51,7 @@ export function UserForm({
     setError,
     setValue,
     getValues,
+    reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<UserFormValues>({
     resolver: zodResolver(
@@ -60,10 +61,25 @@ export function UserForm({
     defaultValues: { name: '', email: '', role: 'MEMBER', password: '', ...defaultValues },
   });
 
+  // Cache Components can keep a page alive in the background after navigating away, so
+  // discard entered data (including a generated password) whenever the form goes away.
+  useEffect(
+    () => () => {
+      reset();
+      setPasswordVisible(false);
+      setFormError(null);
+    },
+    [reset],
+  );
+
   const submit = handleSubmit(async (values) => {
     setFormError(null);
     try {
       await onSubmit(values);
+      setPasswordVisible(false);
+      // Create: back to a blank form. Edit: the saved values become the new baseline.
+      if (mode === 'create') reset();
+      else reset({ ...values, password: '' });
     } catch (error) {
       if (!(error instanceof ApiError)) {
         setFormError('Unexpected error. Please try again.');

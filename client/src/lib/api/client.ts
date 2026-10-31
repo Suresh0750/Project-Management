@@ -5,6 +5,7 @@ import { toApiError } from '@/lib/api/errors';
 export const apiClient = axios.create({
   baseURL: publicEnv.apiUrl,
   withCredentials: true,
+  timeout: 20_000,
   headers: {
     'Content-Type': 'application/json',
   },
