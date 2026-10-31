@@ -84,3 +84,14 @@ export function toApiError(error: unknown): ApiError {
 
   return new ApiError(SERVER_MESSAGE, null);
 }
+
+/**
+ * Normalises whatever a mutation callback receives. TanStack Query also routes an exception
+ * thrown inside a per-call `onSuccess` to `onError`, so the value is not always an ApiError.
+ * The original is logged so a real bug is never hidden behind a generic message.
+ */
+export function asApiError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error;
+  console.error('Unexpected error in a mutation callback', error);
+  return toApiError(error);
+}

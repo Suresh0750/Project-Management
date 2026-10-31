@@ -9,6 +9,7 @@ import { PasswordField } from '@/components/ui/password-field';
 import { useToast } from '@/components/ui/toast-provider';
 import { useChangePassword } from '@/features/auth/hooks';
 import { changePasswordSchema, type ChangePasswordValues } from '@/schemas/auth';
+import { asApiError } from '@/lib/api/errors';
 
 const FIELDS = ['currentPassword', 'newPassword', 'confirmPassword'] as const;
 const EMPTY: ChangePasswordValues = { currentPassword: '', newPassword: '', confirmPassword: '' };
@@ -42,7 +43,8 @@ export function ChangePasswordForm() {
           toast.success('Password updated. Your other devices were signed out.');
           reset(EMPTY);
         },
-        onError: (error) => {
+        onError: (raw) => {
+          const error = asApiError(raw);
           let mapped = false;
           for (const field of FIELDS) {
             const message = error.fieldErrors[field];

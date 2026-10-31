@@ -12,6 +12,7 @@ import { useUpdateProfile } from '@/features/auth/hooks';
 import type { UpdateProfilePayload } from '@/features/auth/api';
 import { profileSchema, type ProfileValues } from '@/schemas/auth';
 import type { AuthUser } from '@/types/auth';
+import { asApiError } from '@/lib/api/errors';
 
 const FIELDS = ['name', 'email', 'currentPassword'] as const;
 
@@ -61,7 +62,8 @@ export function ProfileForm({ user }: { user: AuthUser }) {
         toast.success('Profile updated');
         reset({ name: updated.name, email: updated.email, currentPassword: '' });
       },
-      onError: (error) => {
+      onError: (raw) => {
+        const error = asApiError(raw);
         let mapped = false;
         for (const field of FIELDS) {
           const message = error.fieldErrors[field];

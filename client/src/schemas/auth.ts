@@ -21,6 +21,30 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+export const registerSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, 'Name must be at least 2 characters')
+      .max(100, 'Name must be at most 100 characters'),
+    email,
+    password: passwordPolicy,
+    confirmPassword: z.string().min(1, 'Confirm your password'),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords do not match',
+  });
+
+export const verifyEmailSchema = z.object({
+  email,
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+
 export const forgotPasswordSchema = z.object({ email });
 
 export const resetPasswordSchema = z
@@ -34,6 +58,8 @@ export const resetPasswordSchema = z
   });
 
 export type LoginValues = z.infer<typeof loginSchema>;
+export type RegisterValues = z.infer<typeof registerSchema>;
+export type VerifyEmailValues = z.infer<typeof verifyEmailSchema>;
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 

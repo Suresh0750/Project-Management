@@ -13,6 +13,7 @@ import { TextField } from '@/components/ui/text-field';
 import { useLogin, useSession } from '@/features/auth/hooks';
 import { loginSchema, type LoginValues } from '@/schemas/auth';
 import { resolvePostLoginPath } from '@/utils/role-routes';
+import { asApiError } from '@/lib/api/errors';
 
 export function LoginFormSkeleton() {
   return (
@@ -66,7 +67,14 @@ export function LoginForm() {
       onSuccess: (user) => {
         router.replace(resolvePostLoginPath(user.role, nextPath));
       },
-      onError: (error) => {
+      onError: (raw) => {
+        const error = asApiError(raw);
+        // Right password but the email was never verified: the server just sent a fresh code.
+        if (error.fieldErrors.code === 'EMAIL_NOT_VERIFIED') {
+          router.push(`/verify-email?email=${encodeURIComponent(credentials.email)}&sent=1`);
+          return;
+        }
+
         const fieldEntries = Object.entries(error.fieldErrors);
         for (const [field, message] of fieldEntries) {
           if (field === 'email' || field === 'password') setError(field, { message });

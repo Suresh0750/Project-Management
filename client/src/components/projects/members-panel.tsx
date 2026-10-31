@@ -32,7 +32,7 @@ function AddMemberCard({ project }: { project: ProjectDetail }) {
     <section className="rounded-xl border border-border bg-surface p-5">
       <h3 className="text-sm font-semibold">Add members</h3>
       <p className="mb-3 mt-1 text-xs text-muted-foreground">
-        Only active users with the Member role can be added.
+        Only active Members with a verified email can be added.
       </p>
       <SearchInput
         value={search}
