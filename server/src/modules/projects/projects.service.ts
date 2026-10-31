@@ -287,10 +287,14 @@ export async function addMember(user: AuthUser, id: string, userId: string) {
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, role: true, isActive: true },
+    select: { id: true, name: true, role: true, isActive: true, emailVerifiedAt: true },
   });
-  if (!target || target.role !== Role.MEMBER || !target.isActive) {
-    throw fieldError(400, 'userId', 'Only active Members can be added to a project');
+  if (!target || target.role !== Role.MEMBER || !target.isActive || !target.emailVerifiedAt) {
+    throw fieldError(
+      400,
+      'userId',
+      'Only active Members with a verified email can be added to a project',
+    );
   }
 
   const outbox = new Outbox();
@@ -369,6 +373,7 @@ export async function listMemberCandidates(
   const where: Prisma.UserWhereInput = {
     role: Role.MEMBER,
     isActive: true,
+    emailVerifiedAt: { not: null },
     memberships: { none: { projectId: id } },
   };
   if (query.search) {

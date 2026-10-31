@@ -23,6 +23,7 @@ export const SAFE_USER_SELECT = {
   email: true,
   role: true,
   isActive: true,
+  emailVerifiedAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
