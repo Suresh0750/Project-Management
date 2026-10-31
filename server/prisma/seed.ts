@@ -137,6 +137,7 @@ import {
       name: string;
       description: string;
       managerId: string;
+      createdById: string;
       priority: Priority;
       status: ProjectStatus;
       startDate: Date;
@@ -147,9 +148,11 @@ import {
       });
   
       if (existing) {
+        // createdById is immutable history; only refresh the descriptive fields.
+        const { createdById: _createdById, ...updatable } = data;
         return prisma.project.update({
           where: { id: existing.id },
-          data,
+          data: updatable,
         });
       }
   
@@ -161,6 +164,7 @@ import {
       description:
         "Develop a complete project management and task tracking application.",
       managerId: managerOne.id,
+      createdById: admin.id,
       priority: Priority.HIGH,
       status: ProjectStatus.ACTIVE,
       startDate: new Date("2026-10-01"),
@@ -172,6 +176,7 @@ import {
       description:
         "Design and develop the company website.",
       managerId: managerTwo.id,
+      createdById: admin.id,
       priority: Priority.MEDIUM,
       status: ProjectStatus.PLANNING,
       startDate: new Date("2026-11-01"),
