@@ -3,17 +3,17 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import { Archive, ArchiveRestore, ListChecks, Pencil } from 'lucide-react';
+import { Archive, ArchiveRestore, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { ActivityPanel } from '@/components/projects/activity-panel';
 import { MembersPanel } from '@/components/projects/members-panel';
+import { ProjectTasksPanel } from '@/components/projects/project-tasks-panel';
 import { PriorityBadge, ProjectStatusBadge } from '@/components/projects/project-badges';
 import { ProjectForm } from '@/components/projects/project-form';
 import { useManagerField } from '@/components/projects/use-manager-field';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -233,15 +233,7 @@ export function ProjectDetailPage({ role }: { role: Role }) {
             <Overview project={data} />
           ))}
 
-        {tab === 'tasks' && (
-          <div className="rounded-xl border border-border bg-surface">
-            <EmptyState
-              icon={ListChecks}
-              title="Task management is coming next"
-              description={`This project has ${data.taskCount} task${data.taskCount === 1 ? '' : 's'}. The task list and Kanban board arrive in the next phase.`}
-            />
-          </div>
-        )}
+        {tab === 'tasks' && <ProjectTasksPanel project={data} role={role} />}
 
         {tab === 'members' && <MembersPanel project={data} />}
 

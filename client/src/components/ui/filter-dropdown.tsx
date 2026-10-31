@@ -7,10 +7,10 @@ interface FilterDropdownProps {
   onChange: (value: string) => void;
   options: SelectOption[];
   allLabel: string;
+  hideAll?: boolean;
 }
 
-/** Compact native select for list filters; the empty value means "no filter". */
-export function FilterDropdown({ label, value, onChange, options, allLabel }: FilterDropdownProps) {
+export function FilterDropdown({ label, value, onChange, options, allLabel, hideAll = false }: FilterDropdownProps) {
   return (
     <div className="relative">
       <select
@@ -19,7 +19,7 @@ export function FilterDropdown({ label, value, onChange, options, allLabel }: Fi
         aria-label={label}
         className="h-10 w-full appearance-none rounded-lg border border-border-strong bg-surface pl-3 pr-9 text-sm"
       >
-        <option value="">{allLabel}</option>
+        {!hideAll && <option value="">{allLabel}</option>}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
