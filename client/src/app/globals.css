@@ -100,3 +100,26 @@ body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/*
+ * Tailwind v4 resets buttons to the default arrow. Anything clickable should say so, and a
+ * disabled control should not. These sit in the base layer, so a utility class such as
+ * `cursor-grab` or `cursor-not-allowed` on a component still wins.
+ */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  select:not(:disabled),
+  summary,
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  input[type='date']:not(:disabled)::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+}
