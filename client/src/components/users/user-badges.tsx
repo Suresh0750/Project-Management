@@ -15,3 +15,11 @@ export function RoleBadge({ role }: { role: Role }) {
 export function UserStatusBadge({ isActive }: { isActive: boolean }) {
   return <Badge tone={isActive ? 'success' : 'neutral'}>{isActive ? 'Active' : 'Inactive'}</Badge>;
 }
+
+export function EmailVerifiedBadge({ verifiedAt }: { verifiedAt: string | null }) {
+  return verifiedAt ? (
+    <Badge tone="success">Email verified</Badge>
+  ) : (
+    <Badge tone="warning">Email unverified</Badge>
+  );
+}

@@ -10,7 +10,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast-provider';
 import { UserAvatar } from '@/components/ui/user-avatar';
-import { RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
+import { EmailVerifiedBadge, RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
 import { UserForm } from '@/components/users/user-form';
 import { useSession } from '@/features/auth/hooks';
 import { useUpdateUser, useUpdateUserStatus, useUser } from '@/features/users/hooks';
@@ -112,6 +112,7 @@ export function UserDetailPage() {
             <div className="mt-3 flex gap-2">
               <RoleBadge role={target.role} />
               <UserStatusBadge isActive={target.isActive} />
+              <EmailVerifiedBadge verifiedAt={target.emailVerifiedAt} />
             </div>
           </div>
 

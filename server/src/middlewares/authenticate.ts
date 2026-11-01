@@ -27,15 +27,17 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
         name: true,
         role: true,
         isActive: true,
+        emailVerifiedAt: true,
         tokenVersion: true,
       },
     });
 
     if (!user) throw new HttpError(401, 'User not found');
     if (!user.isActive) throw new HttpError(403, 'Account is deactivated');
+    if (!user.emailVerifiedAt) throw new HttpError(403, 'Email address is not verified');
     if (payload.tv !== user.tokenVersion) throw new HttpError(401, 'Session has been revoked');
 
-    const { tokenVersion: _tokenVersion, ...authUser } = user;
+    const { tokenVersion: _tokenVersion, emailVerifiedAt: _emailVerifiedAt, ...authUser } = user;
     req.user = authUser;
     next();
   } catch (err) {

@@ -8,47 +8,102 @@ import {
   verifyAccessToken,
   verifyRefreshToken,
 } from '../../utils/jwt.js';
+import { env } from '../../config/env.js';
 import { SAFE_USER_SELECT } from '../../constants.js';
+import { consumeOtp, issueOtp } from './otp.service.js';
 import type {
   ChangePasswordInput,
   LoginInput,
   RegisterInput,
   UpdateProfileInput,
+  VerifyEmailInput,
 } from './auth.validation.js';
 
 const SALT_ROUNDS = 12;
 // Real bcrypt hash so unknown-email logins cost the same as wrong-password ones
 const DUMMY_HASH = bcrypt.hashSync('timing-safe-placeholder', SALT_ROUNDS);
 
+const NOT_VERIFIED_CODE = 'EMAIL_NOT_VERIFIED';
+
 // ─── Register ────────────────────────────────────────────────────────────────
-// Public registration always creates MEMBER accounts.
-// Admin/PM creation goes through the user-management module.
+// Public registration always creates an unverified MEMBER and emails a one-time code. No
+// session is issued until the email is verified. Admin/PM accounts are created by an
+// administrator through the user-management module, already verified.
 export async function register(input: RegisterInput) {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
-  if (existing) throw new HttpError(409, 'Email address is already registered');
+  if (existing?.emailVerifiedAt) {
+    const message = 'Email address is already registered';
+    throw new HttpError(409, message, [{ path: 'email', message }]);
+  }
 
-  const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+  // A pending (unverified) account is left exactly as it was created: re-submitting the form
+  // only re-sends the code. Overwriting the credentials would let anyone who knows a pending
+  // address swap in their own password before the real owner verifies.
+  const user =
+    existing ??
+    (await prisma.user.create({
+      data: {
+        name: input.name,
+        email: input.email,
+        passwordHash: await bcrypt.hash(input.password, SALT_ROUNDS),
+        role: Role.MEMBER,
+        emailVerifiedAt: null,
+      },
+      select: { id: true, name: true, email: true },
+    }));
 
-  const user = await prisma.user.create({
-    data: {
-      name: input.name,
-      email: input.email,
-      passwordHash,
-      role: Role.MEMBER,
-    },
-    select: SAFE_USER_SELECT,
+  const { resendAfterSeconds } = await issueOtp(user);
+  return { email: user.email, resendAfterSeconds };
+}
+
+// ─── Verify email (OTP) ───────────────────────────────────────────────────────
+export async function verifyEmail(input: VerifyEmailInput) {
+  const invalid = () =>
+    new HttpError(400, 'The code is invalid or has expired. Request a new one.', [
+      { path: 'otp', message: 'The code is invalid or has expired. Request a new one.' },
+    ]);
+
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  // Unknown and already-verified accounts get the same answer as a wrong code.
+  if (!user || user.emailVerifiedAt) throw invalid();
+  if (!user.isActive) {
+    throw new HttpError(403, 'Your account has been deactivated. Please contact an administrator');
+  }
+
+  await consumeOtp(user.id, input.otp);
+
+  const verified = await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerifiedAt: new Date() },
+    select: { ...SAFE_USER_SELECT, tokenVersion: true },
   });
 
-  // New accounts start at tokenVersion 0 (schema default)
+  // Proving the mailbox is the sign-in, so the user lands in the app without logging in again.
+  const { tokenVersion, ...safeUser } = verified;
   const accessToken = signAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    tokenVersion: 0,
+    sub: safeUser.id,
+    email: safeUser.email,
+    role: safeUser.role,
+    tokenVersion,
   });
-  const refreshToken = signRefreshToken(user.id, 0);
+  const refreshToken = signRefreshToken(safeUser.id, tokenVersion);
 
-  return { user, accessToken, refreshToken };
+  return { user: safeUser, accessToken, refreshToken };
+}
+
+// ─── Resend OTP ───────────────────────────────────────────────────────────────
+// Always answers the same way for unknown or already-verified addresses, so the endpoint
+// cannot be used to discover which emails have accounts.
+export async function resendOtp(email: string) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, name: true, email: true, emailVerifiedAt: true, isActive: true },
+  });
+
+  if (!user || user.emailVerifiedAt || !user.isActive) {
+    return { resendAfterSeconds: env.OTP_RESEND_COOLDOWN_SECONDS };
+  }
+  return issueOtp(user);
 }
 
 // ─── Login ────────────────────────────────────────────────────────────────────
@@ -67,6 +122,19 @@ export async function login(input: LoginInput) {
     throw new HttpError(403, 'Your account has been deactivated. Please contact an administrator');
   }
 
+  // Correct password but unverified email: send a fresh code (if the cooldown allows) and tell
+  // the client to continue on the verification screen.
+  if (!user.emailVerifiedAt) {
+    await issueOtp(user).catch((error: unknown) => {
+      if (!(error instanceof HttpError && error.statusCode === 429)) {
+        console.error('Could not send verification code during login', error);
+      }
+    });
+    throw new HttpError(403, 'Please verify your email address to continue', [
+      { path: 'code', message: NOT_VERIFIED_CODE },
+    ]);
+  }
+
   const accessToken = signAccessToken({
     sub: user.id,
     email: user.email,
@@ -81,6 +149,7 @@ export async function login(input: LoginInput) {
     email: user.email,
     role: user.role,
     isActive: user.isActive,
+    emailVerifiedAt: user.emailVerifiedAt,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -104,6 +173,7 @@ export async function refresh(refreshToken: string) {
 
   if (!record) throw new HttpError(401, 'User not found');
   if (!record.isActive) throw new HttpError(403, 'Account is deactivated');
+  if (!record.emailVerifiedAt) throw new HttpError(403, 'Email address is not verified');
   if (payload.tv !== record.tokenVersion) throw new HttpError(401, 'Session has been revoked');
 
   const { tokenVersion, ...user } = record;

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Suspense } from 'react';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { LoginForm, LoginFormSkeleton } from '@/components/auth/login-form';
@@ -10,7 +11,14 @@ export default function LoginPage() {
     <AuthShell
       title="Welcome back"
       description="Sign in to manage your projects and tasks."
-      footer="Accounts are created by your administrator."
+      footer={
+        <>
+          New here?{' '}
+          <Link href="/register" className="font-medium text-primary hover:underline">
+            Create an account
+          </Link>
+        </>
+      }
     >
       <Suspense fallback={<LoginFormSkeleton />}>
         <LoginForm />

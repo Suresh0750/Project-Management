@@ -8,6 +8,8 @@ export interface AuthUser {
   email: string;
   role: Role;
   isActive: boolean;
+  /** null until the email is verified (self-registered) — admin-created accounts are verified. */
+  emailVerifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

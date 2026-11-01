@@ -56,17 +56,21 @@ enum NotificationType {
 
 // USER
 model User {
-  id           String  @id @default(cuid())
-  name         String
-  email        String  @unique
-  passwordHash String
-  role         Role    @default(MEMBER)
-  isActive     Boolean @default(true)
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  passwordHash    String
+  role            Role      @default(MEMBER)
+  isActive        Boolean   @default(true)
   // Incremented on logout; tokens carrying an older value are rejected.
-  tokenVersion Int     @default(0)
+  tokenVersion    Int       @default(0)
+  // null until the email address is proven (OTP) or an admin created the account.
+  emailVerifiedAt DateTime?
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  emailVerification EmailVerification?
+
   createdProjects Project[]       @relation("ProjectCreator")
   managedProjects Project[]       @relation("ProjectManager")
   memberships     ProjectMember[]
@@ -83,6 +87,19 @@ model User {
 
   @@index([role])
   @@index([isActive])
+}
+
+// EMAIL VERIFICATION (one active one-time code per user)
+model EmailVerification {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  // HMAC of the 6-digit code; the code itself is never stored.
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  sentAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // PROJECT

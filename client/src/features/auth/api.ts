@@ -46,3 +46,30 @@ export async function changePassword(payload: {
   const { data } = await apiClient.patch<ApiSuccess<AuthUserPayload>>('/auth/password', payload);
   return data.data.user;
 }
+
+export interface OtpSent {
+  email: string;
+  resendAfterSeconds: number;
+}
+
+export async function registerAccount(values: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<OtpSent> {
+  const { data } = await apiClient.post<ApiSuccess<OtpSent>>('/auth/register', values);
+  return data.data;
+}
+
+export async function verifyEmail(values: { email: string; otp: string }): Promise<AuthUser> {
+  const { data } = await apiClient.post<ApiSuccess<AuthUserPayload>>('/auth/verify-email', values);
+  return data.data.user;
+}
+
+export async function resendOtp(email: string): Promise<{ resendAfterSeconds: number }> {
+  const { data } = await apiClient.post<ApiSuccess<{ resendAfterSeconds: number }>>(
+    '/auth/resend-otp',
+    { email },
+  );
+  return data.data;
+}

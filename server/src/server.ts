@@ -3,6 +3,7 @@ import './config/env.js';
 
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
+import { startCleanupJobs } from './jobs/cleanup.js';
 import { closeSocket, initSocket } from './realtime/socket.js';
 
 const app = createApp();
@@ -11,14 +12,18 @@ initSocket(httpServer);
 
 const PORT = process.env.PORT || 3000;
 
+let stopCleanup: () => void = () => undefined;
+
 httpServer.listen(PORT, () => {
   console.info(
     `API listening on http://localhost:${PORT} (${process.env.NODE_ENV})`
   );
+  stopCleanup = startCleanupJobs();
 });
 
 const shutdown = (): void => {
   console.info('Shutting down server...');
+  stopCleanup();
 
   void closeSocket().finally(() => {
     httpServer.close(() => {

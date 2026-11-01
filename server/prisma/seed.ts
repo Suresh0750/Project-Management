@@ -51,6 +51,7 @@ import {
         name: "System Admin",
         email: adminEmail,
         passwordHash: adminHash,
+        emailVerifiedAt: new Date(),
         role: Role.ADMIN,
         isActive: true,
       },
@@ -83,6 +84,7 @@ import {
         create: {
           ...data,
           passwordHash: demoHash,
+        emailVerifiedAt: new Date(),
           role: Role.PROJECT_MANAGER,
         },
       });
@@ -122,6 +124,7 @@ import {
         create: {
           ...data,
           passwordHash: demoHash,
+        emailVerifiedAt: new Date(),
           role: Role.MEMBER,
         },
       });

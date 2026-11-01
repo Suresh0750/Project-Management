@@ -7,8 +7,12 @@ import {
   getMe,
   login,
   logout,
+  registerAccount,
+  resendOtp,
   resetPassword,
   updateProfile,
+  verifyEmail,
+  type OtpSent,
   type UpdateProfilePayload,
 } from '@/features/auth/api';
 import type { ApiError } from '@/lib/api/errors';
@@ -73,4 +77,23 @@ export function useChangePassword() {
     mutationFn: changePassword,
     onSuccess: (user) => queryClient.setQueryData(SESSION_QUERY_KEY, user),
   });
+}
+
+export function useRegister() {
+  return useMutation<OtpSent, ApiError, { name: string; email: string; password: string }>({
+    mutationFn: registerAccount,
+  });
+}
+
+/** Verifying the code also signs the user in, so the session cache is filled with the result. */
+export function useVerifyEmail() {
+  const queryClient = useQueryClient();
+  return useMutation<AuthUser, ApiError, { email: string; otp: string }>({
+    mutationFn: verifyEmail,
+    onSuccess: (user) => queryClient.setQueryData(SESSION_QUERY_KEY, user),
+  });
+}
+
+export function useResendOtp() {
+  return useMutation<{ resendAfterSeconds: number }, ApiError, string>({ mutationFn: resendOtp });
 }

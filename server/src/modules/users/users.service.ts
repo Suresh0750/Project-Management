@@ -76,6 +76,8 @@ export async function createUser(input: CreateUserInput) {
         email: input.email,
         passwordHash,
         role: input.role,
+        // An administrator vouches for accounts they create, so no email verification is needed.
+        emailVerifiedAt: new Date(),
       },
       select: SAFE_USER_SELECT,
     });

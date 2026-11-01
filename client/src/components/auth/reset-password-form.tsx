@@ -11,6 +11,7 @@ import { PasswordField } from '@/components/ui/password-field';
 import { useToast } from '@/components/ui/toast-provider';
 import { useResetPassword } from '@/features/auth/hooks';
 import { resetPasswordSchema, type ResetPasswordValues } from '@/schemas/auth';
+import { asApiError } from '@/lib/api/errors';
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -52,7 +53,8 @@ export function ResetPasswordForm() {
           toast.success('Password updated. Sign in with your new password.');
           router.replace('/login');
         },
-        onError: (error) => {
+        onError: (raw) => {
+          const error = asApiError(raw);
           if (error.fieldErrors.password) {
             setError('password', { message: error.fieldErrors.password });
             return;

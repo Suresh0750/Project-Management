@@ -9,16 +9,38 @@ import type {
   ChangePasswordInput,
   LoginInput,
   RegisterInput,
+  ResendOtpInput,
   UpdateProfileInput,
+  VerifyEmailInput,
 } from './auth.validation.js';
 
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { user, accessToken, refreshToken } = await authService.register(
-      req.body as RegisterInput,
+    const result = await authService.register(req.body as RegisterInput);
+    res
+      .status(201)
+      .json(success(result, 'Account created. Enter the verification code we emailed you.'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { user, accessToken, refreshToken } = await authService.verifyEmail(
+      req.body as VerifyEmailInput,
     );
     setAuthCookies(res, accessToken, refreshToken);
-    res.status(201).json(success({ user }, 'Account created successfully'));
+    res.status(200).json(success({ user }, 'Email verified successfully'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await authService.resendOtp((req.body as ResendOtpInput).email);
+    res.status(200).json(success(result, 'If the account needs verification, a new code was sent.'));
   } catch (err) {
     next(err);
   }

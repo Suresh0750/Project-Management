@@ -7,7 +7,9 @@ import {
   changePasswordSchema,
   loginSchema,
   registerSchema,
+  resendOtpSchema,
   updateProfileSchema,
+  verifyEmailSchema,
 } from './auth.validation.js';
 
 const router = Router();
@@ -21,8 +23,24 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Too many attempts. Please try again later.' },
 });
 
-// POST /api/auth/register
-router.post('/register', authLimiter, validate(registerSchema), authController.register);
+// Sign-up + OTP flows get a slightly wider window than login (a legitimate user may need a
+// couple of resends and retries), but are still tightly rate limited per IP.
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many attempts. Please try again later.' },
+});
+
+// POST /api/auth/register  (creates an unverified MEMBER and emails a one-time code)
+router.post('/register', otpLimiter, validate(registerSchema), authController.register);
+
+// POST /api/auth/verify-email  (consumes the code, then signs the user in)
+router.post('/verify-email', otpLimiter, validate(verifyEmailSchema), authController.verifyEmail);
+
+// POST /api/auth/resend-otp
+router.post('/resend-otp', otpLimiter, validate(resendOtpSchema), authController.resendOtp);
 
 // POST /api/auth/login
 router.post('/login', authLimiter, validate(loginSchema), authController.login);

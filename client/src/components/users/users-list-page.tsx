@@ -14,7 +14,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
 import { UserAvatar } from '@/components/ui/user-avatar';
-import { RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
+import { EmailVerifiedBadge, RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
 import { useSession } from '@/features/auth/hooks';
 import { useUpdateUserStatus, useUsers } from '@/features/users/hooks';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -98,7 +98,12 @@ export function UsersListPage() {
     {
       key: 'status',
       header: 'Status',
-      cell: (user) => <UserStatusBadge isActive={user.isActive} />,
+      cell: (user) => (
+        <div className="flex flex-wrap gap-1.5">
+          <UserStatusBadge isActive={user.isActive} />
+          {!user.emailVerifiedAt && <EmailVerifiedBadge verifiedAt={null} />}
+        </div>
+      ),
     },
     {
       key: 'created',
