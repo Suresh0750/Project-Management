@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "prisma skills sync || exit 0",
     "dev": "tsx watch src/server.ts",
+    "prebuild": "npm run db:generate",
     "build": "tsc",
     "start": "tsx src/server.ts",
     "format": "prettier --write .",
@@ -15,6 +16,7 @@
     "db:format": "prisma format --config prisma/prisma.config.ts",
     "db:validate": "prisma validate --config prisma/prisma.config.ts",
     "db:migrate": "prisma migrate dev --config prisma/prisma.config.ts",
+    "db:deploy": "prisma migrate deploy --config prisma/prisma.config.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --config prisma/prisma.config.ts"
   },
