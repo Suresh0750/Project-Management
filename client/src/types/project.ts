@@ -63,3 +63,19 @@ export interface ProjectActivity {
   createdAt: string;
   actor: { id: string; name: string } | null;
 }
+
+/** Whether a project may be archived, with the reasons. The server enforces the same rules. */
+export interface ArchiveReadiness {
+  canArchive: boolean;
+  /** Reasons archiving is refused. */
+  blockers: string[];
+  /** Things worth a look, but they do not stop archiving. */
+  warnings: string[];
+  stats: {
+    totalTasks: number;
+    completedTasks: number;
+    overdueTasks: number;
+    unassignedTasks: number;
+    memberCount: number;
+  };
+}

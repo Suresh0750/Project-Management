@@ -53,6 +53,11 @@ export const archiveProject = handler(async (req, res) => {
     .json(success({ project }, archived ? 'Project archived successfully' : 'Project restored'));
 });
 
+export const getArchiveReadiness = handler(async (req, res) => {
+  const readiness = await projectsService.getArchiveReadiness(req.user!, idOf(req));
+  res.status(200).json(success({ readiness }, 'Archive readiness fetched successfully'));
+});
+
 export const addMember = handler(async (req, res) => {
   const { userId } = req.body as { userId: string };
   const project = await projectsService.addMember(req.user!, idOf(req), userId);

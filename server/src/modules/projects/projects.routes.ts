@@ -38,6 +38,14 @@ router.patch('/:id', manage, validate(updateProjectSchema), controller.updatePro
 // PATCH  /api/projects/:id/archive
 router.patch('/:id/archive', manage, validate(archiveProjectSchema), controller.archiveProject);
 
+// GET    /api/projects/:id/archive-readiness
+router.get(
+  '/:id/archive-readiness',
+  manage,
+  validate(projectIdParamSchema),
+  controller.getArchiveReadiness,
+);
+
 // GET    /api/projects/:id/member-candidates
 router.get(
   '/:id/member-candidates',

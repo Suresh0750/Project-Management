@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface ConfirmDialogProps {
@@ -10,6 +10,10 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   tone?: 'primary' | 'danger';
   loading?: boolean;
+  /** Keeps the confirm button disabled (e.g. while a precondition is not met). */
+  confirmDisabled?: boolean;
+  /** Extra content shown between the description and the buttons. */
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -22,6 +26,8 @@ export function ConfirmDialog({
   confirmLabel,
   tone = 'primary',
   loading = false,
+  confirmDisabled = false,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -51,11 +57,17 @@ export function ConfirmDialog({
       <p id="confirm-dialog-description" className="mt-2 text-sm text-muted-foreground">
         {description}
       </p>
+      {children && <div className="mt-4">{children}</div>}
       <div className="mt-6 flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel} disabled={loading}>
           Cancel
         </Button>
-        <Button variant={tone === 'danger' ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
+        <Button
+          variant={tone === 'danger' ? 'danger' : 'primary'}
+          onClick={onConfirm}
+          loading={loading}
+          disabled={confirmDisabled}
+        >
           {confirmLabel}
         </Button>
       </div>
