@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Archive, ArchiveRestore, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { ActivityPanel } from '@/components/projects/activity-panel';
+import { ArchiveProjectDialog } from '@/components/projects/archive-project-dialog';
 import { MembersPanel } from '@/components/projects/members-panel';
 import { ProjectTasksPanel } from '@/components/projects/project-tasks-panel';
 import { PriorityBadge, ProjectStatusBadge } from '@/components/projects/project-badges';
@@ -13,14 +15,18 @@ import { ProjectForm } from '@/components/projects/project-form';
 import { useManagerField } from '@/components/projects/use-manager-field';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ErrorState } from '@/components/ui/error-state';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, type TabItem } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast-provider';
 import { toProjectPayload, type ProjectPayload } from '@/features/projects/api';
-import { useArchiveProject, useProject, useUpdateProject } from '@/features/projects/hooks';
+import {
+  projectsKeys,
+  useArchiveProject,
+  useProject,
+  useUpdateProject,
+} from '@/features/projects/hooks';
 import { ROLE_BASE_PATH } from '@/lib/auth/navigation';
 import type { ProjectFormValues } from '@/schemas/project';
 import type { Role } from '@/types/auth';
@@ -95,6 +101,7 @@ export function ProjectDetailPage({ role }: { role: Role }) {
   const project = useProject(id);
   const updateProject = useUpdateProject(id);
   const archiveProject = useArchiveProject(id);
+  const queryClient = useQueryClient();
   const managerField = useManagerField(role);
 
   const [tab, setTab] = useState<TabId>('overview');
@@ -155,11 +162,24 @@ export function ProjectDetailPage({ role }: { role: Role }) {
     setEditing(false);
   };
 
-  const toggleArchive = () => {
-    archiveProject.mutate(!archived, {
-      onSuccess: () => toast.success(archived ? 'Project restored' : 'Project archived'),
+  const restoreProject = () => {
+    archiveProject.mutate(false, {
+      onSuccess: () => toast.success('Project restored'),
       onError: (error) => toast.error(error.message),
-      onSettled: () => setConfirmArchive(false),
+    });
+  };
+
+  const archiveNow = () => {
+    archiveProject.mutate(true, {
+      onSuccess: () => {
+        toast.success('Project archived');
+        setConfirmArchive(false);
+      },
+      onError: (error) => {
+        // The rules may have changed since the dialog opened: keep it open with fresh reasons.
+        toast.error(error.message);
+        void queryClient.invalidateQueries({ queryKey: projectsKeys.archiveReadiness(id) });
+      },
     });
   };
 
@@ -172,7 +192,7 @@ export function ProjectDetailPage({ role }: { role: Role }) {
         </Button>
       )}
       {archived ? (
-        <Button variant="secondary" loading={archiveProject.isPending} onClick={toggleArchive}>
+        <Button variant="secondary" loading={archiveProject.isPending} onClick={restoreProject}>
           <ArchiveRestore className="size-4" aria-hidden="true" />
           Restore
         </Button>
@@ -240,15 +260,13 @@ export function ProjectDetailPage({ role }: { role: Role }) {
         {tab === 'activity' && <ActivityPanel projectId={data.id} active={tab === 'activity'} />}
       </div>
 
-      <ConfirmDialog
+      <ArchiveProjectDialog
+        projectId={data.id}
+        projectName={data.name}
         open={confirmArchive}
-        title="Archive project?"
-        description="Archived projects become read-only and are hidden from the default list. You can restore it later."
-        confirmLabel="Archive"
-        tone="danger"
         loading={archiveProject.isPending}
         onCancel={() => setConfirmArchive(false)}
-        onConfirm={toggleArchive}
+        onConfirm={archiveNow}
       />
     </div>
   );

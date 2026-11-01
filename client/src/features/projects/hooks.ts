@@ -13,6 +13,7 @@ import {
   listMemberCandidates,
   listProjectActivities,
   listProjects,
+  getArchiveReadiness,
   getProject,
   removeProjectMember,
   setProjectArchived,
@@ -21,7 +22,7 @@ import {
   type ProjectPayload,
 } from '@/features/projects/api';
 import type { ApiError } from '@/lib/api/errors';
-import type { ProjectDetail } from '@/types/project';
+import type { ArchiveReadiness, ProjectDetail } from '@/types/project';
 
 export const projectsKeys = {
   all: ['projects'] as const,
@@ -29,6 +30,7 @@ export const projectsKeys = {
   detail: (id: string) => ['projects', 'detail', id] as const,
   candidates: (id: string, search: string) => ['projects', 'candidates', id, search] as const,
   activities: (id: string, page: number) => ['projects', 'activities', id, page] as const,
+  archiveReadiness: (id: string) => ['projects', 'archive-readiness', id] as const,
 };
 
 export function useProjects(params: ListProjectsParams, enabled = true) {
@@ -45,6 +47,17 @@ export function useProject(id: string, enabled = true) {
     queryKey: projectsKeys.detail(id),
     queryFn: ({ signal }) => getProject(id, signal),
     enabled,
+  });
+}
+
+export function useArchiveReadiness(id: string, enabled: boolean) {
+  return useQuery<ArchiveReadiness, ApiError>({
+    queryKey: projectsKeys.archiveReadiness(id),
+    queryFn: ({ signal }) => getArchiveReadiness(id, signal),
+    enabled,
+    // Always judge against fresh data: tasks may have changed since the dialog last opened.
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 

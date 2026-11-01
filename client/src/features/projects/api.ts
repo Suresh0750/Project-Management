@@ -2,6 +2,7 @@ import { apiClient } from '@/lib/api/client';
 import { isPaginationMeta, type ApiSuccess, type Paginated } from '@/lib/api/types';
 import type { ProjectFormValues } from '@/schemas/project';
 import type {
+  ArchiveReadiness,
   PersonRef,
   Priority,
   Project,
@@ -132,4 +133,12 @@ export async function listProjectActivities(
     { params: { page, limit: 10 }, signal },
   );
   return paginated(data);
+}
+
+export async function getArchiveReadiness(id: string, signal?: AbortSignal): Promise<ArchiveReadiness> {
+  const { data } = await apiClient.get<ApiSuccess<{ readiness: ArchiveReadiness }>>(
+    `${projectPath(id)}/archive-readiness`,
+    { signal },
+  );
+  return data.data.readiness;
 }

@@ -1,4 +1,4 @@
-import { Role, type Prisma } from '@prisma/client';
+import { ProjectStatus, Role, TaskStatus, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
 import { SAFE_USER_SELECT } from '../../constants.js';
 import { HttpError } from '../../utils/httpError.js';
@@ -258,9 +258,93 @@ export async function updateProject(user: AuthUser, id: string, input: UpdatePro
   return getProject(user, id);
 }
 
+// ─── Archive rules ────────────────────────────────────────────────────────────
+// A project may be archived only when the work is finished:
+//   blockers  (archiving is refused):  status is not COMPLETED, or any task is not COMPLETED
+//   warnings  (allowed, but flagged):  tasks without an assignee, members still on the project
+// Permission is the same as managing the project (administrator or the owning manager).
+const STATUS_LABEL: Record<ProjectStatus, string> = {
+  PLANNING: 'Planning',
+  ACTIVE: 'Active',
+  ON_HOLD: 'On hold',
+  COMPLETED: 'Completed',
+};
+
+const plural = (count: number, one: string, many: string): string =>
+  `${count} ${count === 1 ? one : many}`;
+
+async function computeArchiveReadiness(project: ProjectRow) {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const live: Prisma.TaskWhereInput = { projectId: project.id, deletedAt: null };
+
+  const [totalTasks, incompleteTasks, overdueTasks, unassignedTasks] = await Promise.all([
+    prisma.task.count({ where: live }),
+    prisma.task.count({ where: { ...live, status: { not: TaskStatus.COMPLETED } } }),
+    prisma.task.count({
+      where: { ...live, status: { not: TaskStatus.COMPLETED }, dueDate: { lt: today } },
+    }),
+    prisma.task.count({ where: { ...live, assigneeId: null } }),
+  ]);
+  const memberCount = project._count.members;
+
+  const blockers: string[] = [];
+  if (project.status !== ProjectStatus.COMPLETED) {
+    blockers.push(
+      `The project status is ${STATUS_LABEL[project.status]}. Set it to Completed before archiving.`,
+    );
+  }
+  if (incompleteTasks > 0) {
+    const overdue = overdueTasks > 0 ? ` (${overdueTasks} overdue)` : '';
+    blockers.push(
+      `${plural(incompleteTasks, 'task is', 'tasks are')} not completed yet${overdue}.`,
+    );
+  }
+
+  const warnings: string[] = [];
+  if (unassignedTasks > 0) {
+    warnings.push(`${plural(unassignedTasks, 'task has', 'tasks have')} no assignee.`);
+  }
+  if (memberCount > 0) {
+    warnings.push(
+      `${plural(memberCount, 'member is', 'members are')} still assigned to this project.`,
+    );
+  }
+
+  return {
+    canArchive: blockers.length === 0,
+    blockers,
+    warnings,
+    stats: {
+      totalTasks,
+      completedTasks: totalTasks - incompleteTasks,
+      overdueTasks,
+      unassignedTasks,
+      memberCount,
+    },
+  };
+}
+
+export async function getArchiveReadiness(user: AuthUser, id: string) {
+  return computeArchiveReadiness(await findManageable(user, id));
+}
+
 // ─── Archive / restore ────────────────────────────────────────────────────────
 export async function setProjectArchived(user: AuthUser, id: string, archived: boolean) {
   const project = await findManageable(user, id);
+
+  // Restoring is always allowed. Archiving must satisfy the rules above, checked on the server
+  // so they cannot be bypassed by calling the API directly.
+  if (archived && !project.archivedAt) {
+    const readiness = await computeArchiveReadiness(project);
+    if (!readiness.canArchive) {
+      throw new HttpError(
+        409,
+        'This project cannot be archived yet',
+        readiness.blockers.map((message) => ({ path: 'archive', message })),
+      );
+    }
+  }
 
   if (Boolean(project.archivedAt) !== archived) {
     const outbox = new Outbox();
