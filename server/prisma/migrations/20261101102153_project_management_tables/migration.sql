@@ -6,12 +6,27 @@ CREATE TABLE `User` (
     `passwordHash` VARCHAR(191) NOT NULL,
     `role` ENUM('ADMIN', 'PROJECT_MANAGER', 'MEMBER') NOT NULL DEFAULT 'MEMBER',
     `isActive` BOOLEAN NOT NULL DEFAULT true,
+    `tokenVersion` INTEGER NOT NULL DEFAULT 0,
+    `emailVerifiedAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
     UNIQUE INDEX `User_email_key`(`email`),
     INDEX `User_role_idx`(`role`),
     INDEX `User_isActive_idx`(`isActive`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `EmailVerification` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `codeHash` VARCHAR(191) NOT NULL,
+    `expiresAt` DATETIME(3) NOT NULL,
+    `attempts` INTEGER NOT NULL DEFAULT 0,
+    `sentAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    UNIQUE INDEX `EmailVerification_userId_key`(`userId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -25,6 +40,7 @@ CREATE TABLE `Project` (
     `startDate` DATETIME(3) NULL,
     `deadline` DATETIME(3) NULL,
     `archivedAt` DATETIME(3) NULL,
+    `createdById` VARCHAR(191) NOT NULL,
     `managerId` VARCHAR(191) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
@@ -118,6 +134,12 @@ CREATE TABLE `Notification` (
     INDEX `Notification_userId_readAt_createdAt_idx`(`userId`, `readAt`, `createdAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `EmailVerification` ADD CONSTRAINT `EmailVerification_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Project` ADD CONSTRAINT `Project_createdById_fkey` FOREIGN KEY (`createdById`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `Project` ADD CONSTRAINT `Project_managerId_fkey` FOREIGN KEY (`managerId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

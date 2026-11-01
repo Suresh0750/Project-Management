@@ -38,6 +38,16 @@ import {
   
     const adminHash = await bcrypt.hash(adminPassword, 12);
     const demoHash = await bcrypt.hash(demoPassword, 12);
+
+    // Seeded accounts are trusted, so they never go through the email OTP. This also repairs
+    // accounts that already exist unverified (e.g. someone self-registered the same address
+    // before the seed ran) and keeps the original timestamp for ones that are already verified.
+    async function ensureVerified(userId: string) {
+      await prisma.user.updateMany({
+        where: { id: userId, emailVerifiedAt: null },
+        data: { emailVerifiedAt: new Date() },
+      });
+    }
   
   
     const admin = await prisma.user.upsert({
@@ -57,6 +67,8 @@ import {
       },
     });
   
+    await ensureVerified(admin.id);
+
     console.log("Admin created:", admin.email);
   
   
@@ -84,11 +96,12 @@ import {
         create: {
           ...data,
           passwordHash: demoHash,
-        emailVerifiedAt: new Date(),
+          emailVerifiedAt: new Date(),
           role: Role.PROJECT_MANAGER,
         },
       });
   
+      await ensureVerified(manager.id);
       managers.push(manager);
     }
   
@@ -124,11 +137,12 @@ import {
         create: {
           ...data,
           passwordHash: demoHash,
-        emailVerifiedAt: new Date(),
+          emailVerifiedAt: new Date(),
           role: Role.MEMBER,
         },
       });
   
+      await ensureVerified(member.id);
       members.push(member);
     }
   
