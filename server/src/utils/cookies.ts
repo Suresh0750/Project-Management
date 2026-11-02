@@ -9,6 +9,7 @@ import {
 
 const isProd = env.NODE_ENV === 'production';
 const sameSite = env.COOKIE_SAME_SITE;
+console.log("samesite",sameSite);
 const secure = isProd || sameSite === 'none';
 
 let warnedCrossSite = false;
