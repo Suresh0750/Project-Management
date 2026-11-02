@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
 import { authenticate } from '../../middlewares/authenticate.js';
+import { createRateLimiter, minutes } from '../../middlewares/rateLimit.js';
 import { validate } from '../../middlewares/validate.js';
 import * as authController from './auth.controller.js';
 import {
@@ -14,23 +14,19 @@ import {
 
 const router = Router();
 
-// Strict rate limit for auth endpoints — 10 requests per 15 min per IP
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 100,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many attempts. Please try again later.' },
+// Login and password changes: 10 attempts per 15 minutes per IP.
+const authLimiter = createRateLimiter({
+  windowMs: minutes(15),
+  limit: 10,
+  message: 'Too many attempts. Please try again later.',
 });
 
-// Sign-up + OTP flows get a slightly wider window than login (a legitimate user may need a
-// couple of resends and retries), but are still tightly rate limited per IP.
-const otpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many attempts. Please try again later.' },
+// Sign-up and OTP flows get a wider allowance than login (a real user may need a couple of
+// resends and retries), but are still limited per IP. Each code also allows only a few guesses.
+const otpLimiter = createRateLimiter({
+  windowMs: minutes(15),
+  limit: 100,
+  message: 'Too many attempts. Please try again later.',
 });
 
 // POST /api/auth/register  (creates an unverified MEMBER and emails a one-time code)

@@ -37,6 +37,12 @@ const envSchema = z.object({
   OTP_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(10).max(600).default(60),
   OTP_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),
+
+  // Rate limiting is always on in production. Elsewhere it is off unless this is "true".
+  RATE_LIMIT_ENABLED: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === "true")),
 }).superRefine((values, ctx) => {
   if (values.NODE_ENV === 'production' && (!values.SMTP_HOST || !values.SMTP_FROM)) {
     ctx.addIssue({
