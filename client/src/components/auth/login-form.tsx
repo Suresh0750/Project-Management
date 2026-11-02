@@ -29,6 +29,7 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get('next');
+  const reason = searchParams.get('reason');
 
   const session = useSession();
   const login = useLogin();
@@ -75,11 +76,15 @@ export function LoginForm() {
           return;
         }
 
-        const fieldEntries = Object.entries(error.fieldErrors);
-        for (const [field, message] of fieldEntries) {
-          if (field === 'email' || field === 'password') setError(field, { message });
+        let mapped = false;
+        for (const [field, message] of Object.entries(error.fieldErrors)) {
+          if (field === 'email' || field === 'password') {
+            setError(field, { message });
+            mapped = true;
+          }
         }
-        if (fieldEntries.length === 0) {
+        // Anything not tied to a field (wrong credentials, deactivated account, …) goes in the banner.
+        if (!mapped) {
           setFormError(error.message);
           // Wrong credentials: keep the email, send the user back to retype the password.
           if (error.status === 401) setFocus('password');
@@ -95,6 +100,14 @@ export function LoginForm() {
       noValidate
       className="space-y-4"
     >
+      {reason === 'deactivated' && !formError && (
+        <Alert tone="error">
+          Your account has been deactivated. Please contact your administrator or the support team.
+        </Alert>
+      )}
+      {reason === 'expired' && !formError && (
+        <Alert tone="info">Your session has ended. Please sign in again.</Alert>
+      )}
       {formError && <Alert tone="error">{formError}</Alert>}
 
       <TextField

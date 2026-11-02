@@ -18,3 +18,5 @@ coverage/
 .claude/
 .cursor/
 .devin/
+# Local email design previews (npm run mail:preview)
+.mail-preview/

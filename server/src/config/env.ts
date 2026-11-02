@@ -34,6 +34,9 @@ const envSchema = z.object({
   // e.g. "ProjectFlow <no-reply@yourdomain.com>"
   SMTP_FROM: optionalString,
 
+  // Shown in account-status emails so people know who to contact. Optional.
+  SUPPORT_EMAIL: optionalString,
+
   OTP_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(10).max(600).default(60),
   OTP_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),

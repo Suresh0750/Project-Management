@@ -46,14 +46,21 @@ export function RoleLayout({ role, children }: { role: Role; children: ReactNode
   const session = useSession();
   const user = session.data;
   const unauthenticated = session.error?.status === 401 || session.error?.status === 403;
+  const deactivated = session.error?.fieldErrors.code === 'ACCOUNT_DEACTIVATED';
 
   useEffect(() => {
     if (unauthenticated) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      if (deactivated) {
+        router.replace('/login?reason=deactivated');
+        return;
+      }
+      // A cached user means we had a session that just ended; a first visit has none to lose.
+      const ended = user ? '&reason=expired' : '';
+      router.replace(`/login?next=${encodeURIComponent(pathname)}${ended}`);
     } else if (user && user.role !== role) {
       router.replace(ROLE_HOME[user.role]);
     }
-  }, [unauthenticated, user, role, pathname, router]);
+  }, [unauthenticated, deactivated, user, role, pathname, router]);
 
   if (session.isError && !unauthenticated) {
     return (

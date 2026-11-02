@@ -2,7 +2,8 @@ import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { prisma } from '../../../prisma/client.js';
 import { env } from '../../config/env.js';
 import { HttpError } from '../../utils/httpError.js';
-import { sendMail, verificationEmail } from '../../utils/mailer.js';
+import { verificationEmail } from '../../utils/emailTemplates.js';
+import { sendMail } from '../../utils/mailer.js';
 
 const GENERIC_INVALID = 'The code is invalid or has expired. Request a new one.';
 
@@ -64,7 +65,15 @@ export async function issueOtp(user: OtpTarget): Promise<{ resendAfterSeconds: n
   });
 
   try {
-    await sendMail({ to: user.email, ...verificationEmail(user.name, code, env.OTP_TTL_MINUTES) });
+    await sendMail({
+      to: user.email,
+      ...verificationEmail({
+        name: user.name,
+        email: user.email,
+        code,
+        ttlMinutes: env.OTP_TTL_MINUTES,
+      }),
+    });
   } catch (error) {
     console.error('Failed to send verification email', error);
     // Free the cooldown so the user can retry straight away.

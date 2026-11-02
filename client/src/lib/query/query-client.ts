@@ -4,10 +4,13 @@ import { ApiError } from '@/lib/api/errors';
 const SESSION_KEY = ['auth', 'me'];
 
 export function createQueryClient(): QueryClient {
-  // A 401 that survived the refresh attempt means the session is gone. Re-check the session
-  // so the role layout notices and sends the user to /login.
+  // A 401 that survived the refresh attempt, or a "your account was deactivated" 403, means the
+  // session is gone. Re-check the session so the role layout notices and sends the user to
+  // /login with the right message.
   const handleUnauthorized = (error: unknown, isSessionQuery: boolean) => {
-    if (error instanceof ApiError && error.status === 401 && !isSessionQuery) {
+    if (!(error instanceof ApiError) || isSessionQuery) return;
+    const deactivated = error.status === 403 && error.fieldErrors.code === 'ACCOUNT_DEACTIVATED';
+    if (error.status === 401 || deactivated) {
       void client.invalidateQueries({ queryKey: SESSION_KEY });
     }
   };

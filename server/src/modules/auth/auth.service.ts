@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
+import { accountDeactivated } from '../../utils/accountErrors.js';
 import { HttpError } from '../../utils/httpError.js';
 import {
   signAccessToken,
@@ -67,7 +68,7 @@ export async function verifyEmail(input: VerifyEmailInput) {
   // Unknown and already-verified accounts get the same answer as a wrong code.
   if (!user || user.emailVerifiedAt) throw invalid();
   if (!user.isActive) {
-    throw new HttpError(403, 'Your account has been deactivated. Please contact an administrator');
+    throw accountDeactivated();
   }
 
   await consumeOtp(user.id, input.otp);
@@ -119,7 +120,7 @@ export async function login(input: LoginInput) {
   }
 
   if (!user.isActive) {
-    throw new HttpError(403, 'Your account has been deactivated. Please contact an administrator');
+    throw accountDeactivated();
   }
 
   // Correct password but unverified email: send a fresh code (if the cooldown allows) and tell
@@ -172,7 +173,7 @@ export async function refresh(refreshToken: string) {
   });
 
   if (!record) throw new HttpError(401, 'User not found');
-  if (!record.isActive) throw new HttpError(403, 'Account is deactivated');
+  if (!record.isActive) throw accountDeactivated();
   if (!record.emailVerifiedAt) throw new HttpError(403, 'Email address is not verified');
   if (payload.tv !== record.tokenVersion) throw new HttpError(401, 'Session has been revoked');
 
@@ -230,7 +231,7 @@ export async function getMe(userId: string) {
   });
 
   if (!user) throw new HttpError(404, 'User not found');
-  if (!user.isActive) throw new HttpError(403, 'Account is deactivated');
+  if (!user.isActive) throw accountDeactivated();
 
   return user;
 }

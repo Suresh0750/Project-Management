@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { MailCheck } from 'lucide-react';
+import { ClipboardPaste, MailCheck } from 'lucide-react';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
@@ -37,6 +37,7 @@ export function VerifyEmailForm() {
     setError,
     reset,
     getValues,
+    setValue,
     trigger,
     formState: { errors },
   } = useForm<VerifyEmailValues>({
@@ -65,6 +66,23 @@ export function VerifyEmailForm() {
       },
     });
   });
+
+  // Pull the 6-digit code out of whatever was copied, e.g. the email subject
+  // "123456 is your ProjectFlow verification code" or "123 456".
+  const pasteCode = async () => {
+    try {
+      const copied = await navigator.clipboard.readText();
+      const code = /\d{6}/.exec(copied.replace(/[\s-]/g, ''))?.[0];
+      if (!code) {
+        toast.error('No 6-digit code found on the clipboard.');
+        return;
+      }
+      setValue('otp', code, { shouldValidate: true, shouldDirty: true });
+      setFormError(null);
+    } catch {
+      toast.error('Could not read the clipboard. Paste the code into the box instead.');
+    }
+  };
 
   const resendCode = async () => {
     // Reuse the form's email validation instead of sending a malformed request.
@@ -105,6 +123,17 @@ export function VerifyEmailForm() {
         autoComplete="one-time-code"
         maxLength={6}
         placeholder="••••••"
+        endAdornment={
+          <button
+            type="button"
+            onClick={() => void pasteCode()}
+            aria-label="Paste code from clipboard"
+            title="Paste code"
+            className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+          >
+            <ClipboardPaste className="size-4" aria-hidden="true" />
+          </button>
+        }
         className="text-center text-xl font-semibold tracking-[0.5em]"
         error={errors.otp?.message}
         {...register('otp', {

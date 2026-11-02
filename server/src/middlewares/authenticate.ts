@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { prisma } from '../../prisma/client.js';
+import { accountDeactivated } from '../utils/accountErrors.js';
 import { HttpError } from '../utils/httpError.js';
 import { verifyAccessToken } from '../utils/jwt.js';
 import { ACCESS_TOKEN_COOKIE } from '../constants.js';
@@ -33,7 +34,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     });
 
     if (!user) throw new HttpError(401, 'User not found');
-    if (!user.isActive) throw new HttpError(403, 'Account is deactivated');
+    if (!user.isActive) throw accountDeactivated();
     if (!user.emailVerifiedAt) throw new HttpError(403, 'Email address is not verified');
     if (payload.tv !== user.tokenVersion) throw new HttpError(401, 'Session has been revoked');
 

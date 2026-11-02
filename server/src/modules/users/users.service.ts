@@ -1,7 +1,11 @@
 import bcrypt from 'bcryptjs';
 import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
+import { env } from '../../config/env.js';
+import { disconnectUserSockets } from '../../realtime/socket.js';
 import { HttpError } from '../../utils/httpError.js';
+import { accountStatusEmail } from '../../utils/emailTemplates.js';
+import { sendMail } from '../../utils/mailer.js';
 import { SAFE_USER_SELECT, DEFAULT_PAGE, DEFAULT_LIMIT } from '../../constants.js';
 import type {
   CreateUserInput,
@@ -122,19 +126,41 @@ export async function updateUser(id: string, input: UpdateUserInput, requesterId
 
 // ─── Update user status (activate / deactivate) ───────────────────────────────
 export async function updateUserStatus(id: string, isActive: boolean, requesterId: string) {
-  await assertUserExists(id);
+  const before = await prisma.user.findUnique({ where: { id }, select: { isActive: true } });
+  if (!before) throw new HttpError(404, 'User not found');
 
   // Prevent self-deactivation
   if (id === requesterId && !isActive) {
     throw new HttpError(400, 'You cannot deactivate your own account');
   }
 
-  return prisma.user.update({
+  const user = await prisma.user.update({
     where: { id },
     // Deactivating also revokes every outstanding access/refresh token.
     data: isActive ? { isActive } : { isActive, tokenVersion: { increment: 1 } },
     select: SAFE_USER_SELECT,
   });
+
+  if (before.isActive !== isActive) {
+    // Open tabs and devices learn about it immediately instead of on their next click.
+    if (!isActive) disconnectUserSockets(id);
+
+    // Best effort and off the request path: a slow or failing mail server must never undo or
+    // delay the administrator's action.
+    void sendMail({
+      to: user.email,
+      ...accountStatusEmail({
+        name: user.name,
+        email: user.email,
+        active: isActive,
+        supportEmail: env.SUPPORT_EMAIL,
+      }),
+    }).catch((error: unknown) => {
+      console.error('Could not send the account status email', error);
+    });
+  }
+
+  return user;
 }
 
 // ─── Internal helper ──────────────────────────────────────────────────────────

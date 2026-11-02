@@ -17,7 +17,7 @@ function getTransporter(): Transporter | null {
   return transporter;
 }
 
-interface Mail {
+export interface Mail {
   to: string;
   subject: string;
   text: string;
@@ -33,22 +33,4 @@ export async function sendMail(mail: Mail): Promise<void> {
   }
 
   await transport.sendMail({ from: env.SMTP_FROM, ...mail });
-}
-
-const escapeHtml = (value: string): string =>
-  value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
-
-export function verificationEmail(name: string, code: string, ttlMinutes: number): Omit<Mail, 'to'> {
-  const text =
-    `Hi ${name},\n\n` +
-    `Your ProjectFlow verification code is: ${code}\n\n` +
-    `It expires in ${ttlMinutes} minutes. If you did not create an account, ignore this email.\n`;
-
-  const html =
-    `<p>Hi ${escapeHtml(name)},</p>` +
-    `<p>Your ProjectFlow verification code is:</p>` +
-    `<p style="font-size:28px;font-weight:700;letter-spacing:6px">${escapeHtml(code)}</p>` +
-    `<p>It expires in ${ttlMinutes} minutes. If you did not create an account, ignore this email.</p>`;
-
-  return { subject: 'Your ProjectFlow verification code', text, html };
 }
