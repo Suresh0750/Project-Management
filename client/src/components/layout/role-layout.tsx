@@ -64,6 +64,13 @@ export function RoleLayout({ role, children }: { role: Role; children: ReactNode
     );
   }
 
+  // The session ended (logged out elsewhere, or it expired). A failed re-check keeps the old
+  // cached user, so without this the whole app would stay mounted, firing queries that all fail
+  // and flashing error states until the redirect lands. Stop rendering it straight away.
+  if (unauthenticated) {
+    return <ShellSkeleton />;
+  }
+
   // Still loading: show the page inside the skeleton shell. Signed out or wrong role: no content.
   if (session.isPending) {
     return <ShellSkeleton>{children}</ShellSkeleton>;

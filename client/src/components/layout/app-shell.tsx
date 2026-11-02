@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { LayoutDashboard, Menu } from 'lucide-react';
 import { NotificationDropdown } from '@/components/notifications/notification-dropdown';
 import { AppSidebar } from '@/components/layout/app-sidebar';
@@ -9,6 +9,7 @@ import { MobileSidebar } from '@/components/layout/mobile-sidebar';
 import { ProfileMenu } from '@/components/layout/profile-menu';
 import { useLogout } from '@/features/auth/hooks';
 import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed';
+import { broadcastLogout, onLogoutElsewhere } from '@/lib/auth/session-sync';
 import { disconnectSocket } from '@/lib/socket/client';
 import { useRealtime } from '@/lib/socket/use-realtime';
 import type { AuthUser } from '@/types/auth';
@@ -22,11 +23,26 @@ export function AppShell({ user, children }: { user: AuthUser; children: ReactNo
   // Live updates for as long as the user is signed in and this shell is mounted.
   useRealtime();
 
+  // Signed out in another tab: leave immediately. A full navigation (not a client-side one) drops
+  // every cached query and open connection, so nothing keeps calling the API with a dead session.
+  useEffect(
+    () =>
+      onLogoutElsewhere(() => {
+        disconnectSocket();
+        window.location.replace('/login');
+      }),
+    [],
+  );
+
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   const handleLogout = useCallback(() => {
     disconnectSocket();
-    logout.mutate(undefined, { onSettled: () => router.replace('/login') });
+    logout.mutate(undefined, {
+      // Only tell the other tabs once the server confirmed the session is revoked.
+      onSuccess: broadcastLogout,
+      onSettled: () => router.replace('/login'),
+    });
   }, [logout, router]);
 
   return (

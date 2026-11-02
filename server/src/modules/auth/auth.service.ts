@@ -190,14 +190,18 @@ export async function refresh(refreshToken: string) {
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
 // Bumping tokenVersion invalidates all access and refresh tokens for the user.
-export async function logout(accessToken?: string, refreshToken?: string): Promise<void> {
+export async function logout(
+  accessToken?: string,
+  refreshToken?: string,
+): Promise<string | undefined> {
   const userId = identifyUser(accessToken, refreshToken);
-  if (!userId) return; // nothing valid to revoke; cookies are cleared by the caller
+  if (!userId) return undefined; // nothing valid to revoke; cookies are cleared by the caller
 
   await prisma.user.updateMany({
     where: { id: userId },
     data: { tokenVersion: { increment: 1 } },
   });
+  return userId;
 }
 
 function identifyUser(accessToken?: string, refreshToken?: string): string | undefined {

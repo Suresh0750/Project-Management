@@ -61,11 +61,14 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 // Public on purpose: a user whose access token has expired must still be able to log out.
 export async function logout(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await authService.logout(
+    const userId = await authService.logout(
       req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined,
       req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined,
     );
     clearAuthCookies(res);
+    // Every session of this user was just revoked, so end their live connections as well. Other
+    // devices then notice at once instead of on their next click.
+    if (userId) disconnectUserSockets(userId);
     res.status(200).json(success(null, 'Logged out successfully'));
   } catch (err) {
     next(err);
