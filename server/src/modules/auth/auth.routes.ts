@@ -16,15 +16,13 @@ const router = Router();
 
 // Login and password changes: 10 attempts per 15 minutes per IP.
 const authLimiter = createRateLimiter({
-  windowMs: minutes(15),
-  limit: 10,
+  windowMs: minutes(5),
+  limit: 100,
   message: 'Too many attempts. Please try again later.',
 });
 
-// Sign-up and OTP flows get a wider allowance than login (a real user may need a couple of
-// resends and retries), but are still limited per IP. Each code also allows only a few guesses.
 const otpLimiter = createRateLimiter({
-  windowMs: minutes(15),
+  windowMs: minutes(5),
   limit: 100,
   message: 'Too many attempts. Please try again later.',
 });

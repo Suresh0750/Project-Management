@@ -40,7 +40,7 @@ export function createApp() {
 
   // Global rate limiter
   const globalLimiter = rateLimit({
-    windowMs: 15,
+    windowMs: 5,
     limit: 600,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
