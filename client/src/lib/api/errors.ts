@@ -95,3 +95,8 @@ export function asApiError(error: unknown): ApiError {
   console.error('Unexpected error in a mutation callback', error);
   return toApiError(error);
 }
+
+/** The server's "this account was deactivated" answer (see server/src/utils/accountErrors.ts). */
+export function isAccountDeactivated(error: ApiError): boolean {
+  return error.status === 403 && error.fieldErrors.code === 'ACCOUNT_DEACTIVATED';
+}

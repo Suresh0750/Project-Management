@@ -1,11 +1,20 @@
 import type { NextFunction, Request, Response } from 'express';
 import { prisma } from '../../prisma/client.js';
 import { accountDeactivated } from '../utils/accountErrors.js';
+import { clearAuthCookies } from '../utils/cookies.js';
 import { HttpError } from '../utils/httpError.js';
 import { verifyAccessToken } from '../utils/jwt.js';
 import { ACCESS_TOKEN_COOKIE } from '../constants.js';
 
-export async function authenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
+export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // A rejection that means the session is over for good (not just an expired access token, which
+  // the refresh cookie can still renew) also removes the cookies, so the browser stops sending
+  // dead credentials on every request.
+  const sessionOver = (error: HttpError): HttpError => {
+    clearAuthCookies(res);
+    return error;
+  };
+
   try {
     const cookieToken = req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined;
     const headerToken = extractBearerToken(req);
@@ -33,10 +42,12 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       },
     });
 
-    if (!user) throw new HttpError(401, 'User not found');
-    if (!user.isActive) throw accountDeactivated();
+    if (!user) throw sessionOver(new HttpError(401, 'User not found'));
+    if (!user.isActive) throw sessionOver(accountDeactivated());
     if (!user.emailVerifiedAt) throw new HttpError(403, 'Email address is not verified');
-    if (payload.tv !== user.tokenVersion) throw new HttpError(401, 'Session has been revoked');
+    if (payload.tv !== user.tokenVersion) {
+      throw sessionOver(new HttpError(401, 'Session has been revoked'));
+    }
 
     const { tokenVersion: _tokenVersion, emailVerifiedAt: _emailVerifiedAt, ...authUser } = user;
     req.user = authUser;

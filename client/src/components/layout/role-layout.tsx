@@ -1,12 +1,13 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/features/auth/hooks';
+import { disconnectSocket } from '@/lib/socket/client';
 import type { Role } from '@/types/auth';
 import { ROLE_HOME } from '@/utils/role-routes';
 
@@ -48,15 +49,32 @@ export function RoleLayout({ role, children }: { role: Role; children: ReactNode
   const unauthenticated = session.error?.status === 401 || session.error?.status === 403;
   const deactivated = session.error?.fieldErrors.code === 'ACCOUNT_DEACTIVATED';
 
+  // Guards against running the redirect more than once while state is still settling.
+  const leaving = useRef(false);
+
   useEffect(() => {
     if (unauthenticated) {
-      if (deactivated) {
-        router.replace('/login?reason=deactivated');
+      const target = deactivated
+        ? '/login?reason=deactivated'
+        : `/login?next=${encodeURIComponent(pathname)}${user ? '&reason=expired' : ''}`;
+
+      // Never navigate to the page we are already on.
+      if (`${window.location.pathname}${window.location.search}` === target) return;
+
+      if (!user) {
+        // A first visit with no session: nothing cached, a normal redirect is enough.
+        router.replace(target);
         return;
       }
-      // A cached user means we had a session that just ended; a first visit has none to lose.
-      const ended = user ? '&reason=expired' : '';
-      router.replace(`/login?next=${encodeURIComponent(pathname)}${ended}`);
+
+      // A session that existed just ended (deactivated, logged out elsewhere, expired). The
+      // cache still holds the old user, so a client-side redirect lets /login believe we are
+      // signed in and bounce straight back, repeating requests and flickering. A full page
+      // navigation drops the cache and the live connection, so there is nothing to bounce on.
+      if (leaving.current) return;
+      leaving.current = true;
+      disconnectSocket();
+      window.location.replace(target);
     } else if (user && user.role !== role) {
       router.replace(ROLE_HOME[user.role]);
     }

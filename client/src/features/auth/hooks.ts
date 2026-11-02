@@ -21,12 +21,14 @@ import type { LoginValues } from '@/schemas/auth';
 
 export const SESSION_QUERY_KEY = ['auth', 'me'] as const;
 
-export function useSession() {
+/** Pass false to skip the check when the answer is already known (e.g. just signed out). */
+export function useSession(enabled = true) {
   return useQuery<AuthUser, ApiError>({
     queryKey: SESSION_QUERY_KEY,
     queryFn: ({ signal }) => getMe(signal),
     retry: false,
     staleTime: 60_000,
+    enabled,
   });
 }
 

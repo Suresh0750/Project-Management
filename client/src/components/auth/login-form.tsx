@@ -31,7 +31,11 @@ export function LoginForm() {
   const nextPath = searchParams.get('next');
   const reason = searchParams.get('reason');
 
-  const session = useSession();
+  // The URL already says the session ended (we were just sent here because the account was
+  // deactivated or the session expired), so there is nothing to ask the server. Asking again would
+  // cost a request plus a refresh attempt and flash a skeleton before the form.
+  const sessionKnownEnded = reason === 'deactivated' || reason === 'expired';
+  const session = useSession(!sessionKnownEnded);
   const login = useLogin();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -50,14 +54,18 @@ export function LoginForm() {
 
   const clearFormError = () => setFormError(null);
 
+  // A cached user whose latest check failed is a session that ended, not a signed-in user.
+  // Trusting it would send us back to the dashboard that just sent us here.
+  const signedInUser = session.isError ? undefined : session.data;
+
   // Already signed in: skip the form and go to the role dashboard.
   useEffect(() => {
-    if (session.data) {
-      router.replace(resolvePostLoginPath(session.data.role, nextPath));
+    if (signedInUser) {
+      router.replace(resolvePostLoginPath(signedInUser.role, nextPath));
     }
-  }, [session.data, nextPath, router]);
+  }, [signedInUser, nextPath, router]);
 
-  if (session.isPending || session.data) {
+  if ((session.isPending && !sessionKnownEnded) || signedInUser) {
     return <LoginFormSkeleton />;
   }
 

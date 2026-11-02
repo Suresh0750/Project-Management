@@ -8,9 +8,15 @@ export function createQueryClient(): QueryClient {
   // session is gone. Re-check the session so the role layout notices and sends the user to
   // /login with the right message.
   const handleUnauthorized = (error: unknown, isSessionQuery: boolean) => {
+    // A deactivated account never gets here: the API client has already ended the session and
+    // left for /login, so no re-check is needed (or allowed).
     if (!(error instanceof ApiError) || isSessionQuery) return;
-    const deactivated = error.status === 403 && error.fieldErrors.code === 'ACCOUNT_DEACTIVATED';
-    if (error.status === 401 || deactivated) {
+    if (error.status === 401) {
+      // One failing page can have a dozen requests error at once. Re-check the session only if
+      // that is not already happening or already known to have failed; invalidating per request
+      // would cancel and restart the same check again and again.
+      const state = client.getQueryState(SESSION_KEY);
+      if (state?.fetchStatus === 'fetching' || state?.status === 'error') return;
       void client.invalidateQueries({ queryKey: SESSION_KEY });
     }
   };

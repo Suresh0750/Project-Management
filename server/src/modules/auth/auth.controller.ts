@@ -84,6 +84,11 @@ export async function refreshTokens(req: Request, res: Response, next: NextFunct
     setAuthCookies(res, accessToken, refreshToken);
     res.status(200).json(success({ user }, 'Tokens refreshed successfully'));
   } catch (err) {
+    // The refresh token is the last credential. If it is invalid, expired, revoked or its owner
+    // was deactivated, nothing can renew this session, so remove the cookies as well.
+    if (err instanceof HttpError && (err.statusCode === 401 || err.statusCode === 403)) {
+      clearAuthCookies(res);
+    }
     next(err);
   }
 }

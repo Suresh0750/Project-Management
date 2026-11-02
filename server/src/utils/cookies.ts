@@ -27,27 +27,30 @@ function warnIfCookiesWillBeDropped(req: Request | undefined): void {
   );
 }
 
+
+const baseOptions = { httpOnly: true, secure, sameSite } as const;
+
+const ACCESS_PATH = '/';
+const REFRESH_PATH = '/api/auth'; // restrict the refresh token to auth routes only
+
 export function setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
   warnIfCookiesWillBeDropped(res.req);
 
   res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
-    httpOnly: true,
-    secure,
-    sameSite,
+    ...baseOptions,
     maxAge: ACCESS_COOKIE_MAX_AGE_MS,
-    path: '/',
+    path: ACCESS_PATH,
   });
 
   res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
-    httpOnly: true,
-    secure,
-    sameSite,
+    ...baseOptions,
     maxAge: REFRESH_COOKIE_MAX_AGE_MS,
-    path: '/api/auth',   // restrict refresh token to auth routes only
+    path: REFRESH_PATH,
   });
 }
 
+/** Tells the browser to delete both login cookies. Call it whenever a session is over for good. */
 export function clearAuthCookies(res: Response): void {
-  res.clearCookie(ACCESS_TOKEN_COOKIE, { path: '/' });
-  res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/auth' });
+  res.clearCookie(ACCESS_TOKEN_COOKIE, { ...baseOptions, path: ACCESS_PATH });
+  res.clearCookie(REFRESH_TOKEN_COOKIE, { ...baseOptions, path: REFRESH_PATH });
 }
