@@ -1,3 +1,4 @@
+import { clearTokens } from '@/lib/auth/token-store';
 import { disconnectSocket } from '@/lib/socket/client';
 
 export type SessionEndReason = 'deactivated';
@@ -23,6 +24,7 @@ export function endSession(reason: SessionEndReason): void {
   if (`${window.location.pathname}${window.location.search}` === target) return;
 
   ended = true;
+  clearTokens();
   disconnectSocket();
   window.location.replace(target);
 }

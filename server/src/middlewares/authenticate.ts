@@ -16,9 +16,9 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   };
 
   try {
-    const cookieToken = req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined;
-    const headerToken = extractBearerToken(req);
-    const token = cookieToken ?? headerToken;
+    // The client sends the bearer header on every request; the cookie covers older sessions.
+    const token =
+      extractBearerToken(req) ?? (req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined);
 
     if (!token) throw new HttpError(401, 'Authentication required');
 
@@ -57,7 +57,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 }
 
-function extractBearerToken(req: Request): string | undefined {
+export function extractBearerToken(req: Request): string | undefined {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return undefined;
   return authHeader.slice(7);

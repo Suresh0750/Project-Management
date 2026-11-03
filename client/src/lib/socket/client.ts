@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 import { publicEnv } from '@/lib/env';
+import { getTokens } from '@/lib/auth/token-store';
 
 let socket: Socket | null = null;
 
@@ -12,6 +13,8 @@ export function getSocket(): Socket {
     socket = io(publicEnv.socketUrl, {
       autoConnect: false,
       withCredentials: true,
+      // Read on every (re)connect, so a refreshed token is used automatically.
+      auth: (send) => send({ token: getTokens()?.accessToken ?? null }),
       transports: ['websocket', 'polling'],
     });
   }

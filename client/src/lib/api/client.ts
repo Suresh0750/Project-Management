@@ -2,6 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { publicEnv } from '@/lib/env';
 import { ApiError, isAccountDeactivated, toApiError } from '@/lib/api/errors';
 import { endSession, isSessionEnded } from '@/lib/auth/session-guard';
+import { clearTokens, getTokens, setTokens, type StoredTokens } from '@/lib/auth/token-store';
 
 export const apiClient = axios.create({
   baseURL: publicEnv.apiUrl,
@@ -22,7 +23,20 @@ apiClient.interceptors.request.use((config) => {
       { code: 'ACCOUNT_DEACTIVATED' },
     );
   }
+  // Every request carries the token as a Bearer header (cookies are still sent as well).
+  const tokens = getTokens();
+  if (tokens) config.headers.set('Authorization', `Bearer ${tokens.accessToken}`);
   return config;
+});
+
+// Login, verify-email, refresh and change-password return a fresh token pair: keep it.
+apiClient.interceptors.response.use((response) => {
+  const tokens = (response.data as { data?: { tokens?: Partial<StoredTokens> } } | undefined)?.data
+    ?.tokens;
+  if (typeof tokens?.accessToken === 'string' && typeof tokens.refreshToken === 'string') {
+    setTokens({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+  }
+  return response;
 });
 
 // These calls answer "deactivated" for someone typing credentials on the form itself. The form
@@ -38,10 +52,16 @@ type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 let refreshInFlight: Promise<void> | null = null;
 
 /** Single-flight: concurrent 401s share one refresh call (refresh tokens rotate). */
-function refreshSession(): Promise<void> {
+export function refreshSession(): Promise<void> {
   refreshInFlight ??= apiClient
-    .post('/auth/refresh')
+    .post('/auth/refresh', { refreshToken: getTokens()?.refreshToken })
     .then(() => undefined)
+    .catch((error: unknown) => {
+      // Only a definite "no" ends the stored session; a network blip must not sign anyone out.
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      if (status === 401 || status === 403) clearTokens();
+      throw error;
+    })
     .finally(() => {
       refreshInFlight = null;
     });
