@@ -47,7 +47,10 @@ async function authenticateSocket(socket: Socket, next: (error?: Error) => void)
       return;
     }
 
-    const token = readCookie(socket.handshake.headers.cookie, ACCESS_TOKEN_COOKIE);
+    const handshakeToken = (socket.handshake.auth as { token?: unknown } | undefined)?.token;
+    const token =
+      (typeof handshakeToken === 'string' && handshakeToken ? handshakeToken : undefined) ??
+      readCookie(socket.handshake.headers.cookie, ACCESS_TOKEN_COOKIE);
     if (!token) {
       next(new Error('unauthorized'));
       return;

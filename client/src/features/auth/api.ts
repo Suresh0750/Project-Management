@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api/client';
+import { clearTokens, getTokens } from '@/lib/auth/token-store';
 import type { ApiSuccess } from '@/lib/api/types';
 import type { AuthUser, AuthUserPayload } from '@/types/auth';
 import type { LoginValues } from '@/schemas/auth';
@@ -16,7 +17,13 @@ export async function getMe(signal?: AbortSignal): Promise<AuthUser> {
 }
 
 export async function logout(): Promise<void> {
-  await apiClient.post('/auth/logout');
+  const refreshToken = getTokens()?.refreshToken;
+  try {
+    await apiClient.post('/auth/logout', { refreshToken });
+  } finally {
+    // Whatever the server said, this browser no longer holds a session.
+    clearTokens();
+  }
 }
 
 // NOTE: the server does not expose these two endpoints yet (reported after Phase 1).
