@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast-provider';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { EmailVerifiedBadge, RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
+import { EmailChangePanel } from '@/components/users/email-change-panel';
 import { UserForm } from '@/components/users/user-form';
 import { useSession } from '@/features/auth/hooks';
 import { useUpdateUser, useUpdateUserStatus, useUser } from '@/features/users/hooks';
@@ -35,6 +36,8 @@ export function UserDetailPage() {
   const updateUser = useUpdateUser(id);
   const updateStatus = useUpdateUserStatus();
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  // Cooldown of the code that was just sent (so "Resend" starts disabled).
+  const [codeCooldown, setCodeCooldown] = useState(0);
 
   if (user.isPending) return <DetailSkeleton />;
 
@@ -76,8 +79,13 @@ export function UserDetailPage() {
       if (role) payload.role = role;
     }
 
-    const updated = await updateUser.mutateAsync(payload);
-    toast.success(`${updated.name} was updated`);
+    const { user: updated, emailChange } = await updateUser.mutateAsync(payload);
+    if (emailChange) {
+      setCodeCooldown(emailChange.resendAfterSeconds);
+      toast.success(`Code sent to ${emailChange.newEmail}. The email changes once it is entered.`);
+    } else {
+      toast.success(`${updated.name} was updated`);
+    }
   };
 
   const setActive = (isActive: boolean) => {
@@ -152,9 +160,17 @@ export function UserDetailPage() {
 
         <section className="rounded-xl border border-border bg-surface p-6">
           <h2 className="mb-4 text-base font-semibold">Edit details</h2>
+          {target.pendingEmail && (
+            <EmailChangePanel
+              userId={target.id}
+              currentEmail={target.email}
+              pendingEmail={target.pendingEmail}
+              initialCooldown={codeCooldown}
+            />
+          )}
           {/* Remount on server-side updates so the form baseline matches the saved user. */}
           <UserForm
-            key={target.updatedAt}
+            key={`${target.updatedAt}:${target.pendingEmail ?? ''}`}
             mode="edit"
             defaultValues={{ name: target.name, email: target.email, role: target.role }}
             {...(roleLockedReason ? { roleLockedReason } : {})}

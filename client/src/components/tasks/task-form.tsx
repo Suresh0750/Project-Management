@@ -11,6 +11,7 @@ import { TextField } from '@/components/ui/text-field';
 import { useProject, useProjects } from '@/features/projects/hooks';
 import { ApiError } from '@/lib/api/errors';
 import { taskFormSchema, type TaskFormValues } from '@/schemas/task';
+import { todayInputValue } from '@/utils/format';
 import { PRIORITIES, PRIORITY_LABEL } from '@/types/project';
 import { TASK_STATUSES, TASK_STATUS_LABEL } from '@/types/task';
 
@@ -56,7 +57,7 @@ export function TaskForm({
     reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<TaskFormValues>({
-    resolver: zodResolver(taskFormSchema(mode)) as Resolver<TaskFormValues>,
+    resolver: zodResolver(taskFormSchema(mode, defaultValues?.dueDate ?? '')) as Resolver<TaskFormValues>,
     mode: 'onTouched',
     defaultValues: {
       title: '',
@@ -195,6 +196,11 @@ export function TaskForm({
           <TextField
             label="Due date"
             type="date"
+            min={
+              defaultValues?.dueDate && defaultValues.dueDate < todayInputValue()
+                ? defaultValues.dueDate
+                : todayInputValue()
+            }
             error={errors.dueDate?.message}
             {...register('dueDate')}
           />

@@ -1,5 +1,6 @@
 'use client';
 
+import { readableMessage } from '@/utils/format';
 import { useState } from 'react';
 import { BellOff, CheckCheck, SearchX } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
@@ -131,7 +132,7 @@ export function NotificationsPage({ role }: { role: Role }) {
                 className="mr-3 h-8 shrink-0 px-2 text-xs"
                 onClick={() => handleMarkRead(notification)}
                 loading={markRead.isPending && markRead.variables?.id === notification.id}
-                aria-label={`Mark "${notification.message}" as read`}
+                aria-label={`Mark "${readableMessage(notification.message)}" as read`}
               >
                 Mark as read
               </Button>

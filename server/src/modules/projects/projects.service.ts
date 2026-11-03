@@ -198,6 +198,13 @@ export async function createProject(user: AuthUser, input: CreateProjectInput) {
       actorId: user.id,
       projectId: project.id,
     });
+    outbox.addNotifications(
+      await notifyUsers(tx, [managerId], user.id, {
+        type: 'PROJECT_MANAGER_ASSIGNED',
+        message: `${user.name} made you the Project Manager of "${input.name}"`,
+        projectId: project.id,
+      }),
+    );
     return project;
   });
 
@@ -246,6 +253,24 @@ export async function updateProject(user: AuthUser, id: string, input: UpdatePro
       projectId: id,
       metadata: { fields: Object.keys(data) },
     });
+
+    if (input.managerId !== undefined && input.managerId !== project.managerId) {
+      const projectName = input.name ?? project.name;
+      outbox.addNotifications(
+        await notifyUsers(tx, [input.managerId], user.id, {
+          type: 'PROJECT_MANAGER_ASSIGNED',
+          message: `${user.name} made you the Project Manager of "${projectName}"`,
+          projectId: id,
+        }),
+      );
+      outbox.addNotifications(
+        await notifyUsers(tx, [project.managerId], user.id, {
+          type: 'PROJECT_MANAGER_REMOVED',
+          message: `You are no longer the Project Manager of "${projectName}"`,
+          projectId: id,
+        }),
+      );
+    }
   });
 
   if (input.managerId !== undefined && input.managerId !== project.managerId) {
@@ -437,6 +462,13 @@ export async function removeMember(user: AuthUser, id: string, userId: string) {
       projectId: id,
       metadata: { userId },
     });
+    outbox.addNotifications(
+      await notifyUsers(tx, [userId], user.id, {
+        type: 'PROJECT_MEMBER_REMOVED',
+        message: `${user.name} removed you from the project "${project.name}"`,
+        projectId: id,
+      }),
+    );
   });
 
   // The removed user hears about it first, then stops receiving this project's events.

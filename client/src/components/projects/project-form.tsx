@@ -9,6 +9,7 @@ import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { TextareaField } from '@/components/ui/textarea-field';
 import { TextField } from '@/components/ui/text-field';
 import { ApiError } from '@/lib/api/errors';
+import { todayInputValue } from '@/utils/format';
 import { projectFormSchema, type ProjectFormValues } from '@/schemas/project';
 import {
   PRIORITIES,
@@ -58,7 +59,9 @@ export function ProjectForm({
     reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<ProjectFormValues>({
-    resolver: zodResolver(projectFormSchema(Boolean(managerField))) as Resolver<ProjectFormValues>,
+    resolver: zodResolver(
+      projectFormSchema(Boolean(managerField), !defaultValues),
+    ) as Resolver<ProjectFormValues>,
     mode: 'onTouched',
     defaultValues: {
       name: '',
@@ -73,6 +76,9 @@ export function ProjectForm({
   });
 
   const startDate = useWatch({ control, name: 'startDate' });
+  // On the create page nothing can be dated before today; editing keeps the dates already saved.
+  const creating = !defaultValues;
+  const today = todayInputValue();
 
   // Cache Components can keep a page alive in the background after navigating away, so
   // discard entered data whenever the form goes away.
@@ -136,13 +142,14 @@ export function ProjectForm({
         <TextField
           label="Start date"
           type="date"
+          min={creating ? today : undefined}
           error={errors.startDate?.message}
           {...register('startDate')}
         />
         <TextField
           label="Deadline"
           type="date"
-          min={startDate || undefined}
+          min={(startDate && startDate > today ? startDate : creating ? today : startDate) || undefined}
           error={errors.deadline?.message}
           {...register('deadline')}
         />

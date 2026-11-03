@@ -59,12 +59,39 @@ export async function createUser(payload: CreateUserPayload): Promise<AuthUser> 
   return data.data.user;
 }
 
-export async function updateUser(id: string, payload: UpdateUserPayload): Promise<AuthUser> {
-  const { data } = await apiClient.patch<ApiSuccess<UserPayload>>(
+export interface UpdateUserResult {
+  user: AuthUser;
+  /** Set when the email was NOT changed yet: a code was sent to this address. */
+  emailChange: { newEmail: string; resendAfterSeconds: number } | null;
+}
+
+export async function updateUser(id: string, payload: UpdateUserPayload): Promise<UpdateUserResult> {
+  const { data } = await apiClient.patch<ApiSuccess<UpdateUserResult>>(
     `/users/${encodeURIComponent(id)}`,
     payload,
   );
+  return data.data;
+}
+
+export async function confirmEmailChange(id: string, otp: string): Promise<AuthUser> {
+  const { data } = await apiClient.post<ApiSuccess<UserPayload>>(
+    `/users/${encodeURIComponent(id)}/email/verify`,
+    { otp },
+  );
   return data.data.user;
+}
+
+export async function resendEmailChangeCode(
+  id: string,
+): Promise<{ newEmail: string; resendAfterSeconds: number }> {
+  const { data } = await apiClient.post<ApiSuccess<{ newEmail: string; resendAfterSeconds: number }>>(
+    `/users/${encodeURIComponent(id)}/email/resend`,
+  );
+  return data.data;
+}
+
+export async function cancelEmailChange(id: string): Promise<void> {
+  await apiClient.delete(`/users/${encodeURIComponent(id)}/email/pending`);
 }
 
 export async function updateUserStatus(id: string, isActive: boolean): Promise<AuthUser> {

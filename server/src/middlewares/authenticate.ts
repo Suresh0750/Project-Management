@@ -29,9 +29,6 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       throw new HttpError(401, 'Invalid or expired access token');
     }
 
-    // One query: the device's session and its owner. A session that was logged out (deleted) or
-    // expired no longer authenticates, even though the JWT itself is still valid. Tokens from
-    // before sessions existed have no sid and are asked to log in again.
     const session = payload.sid
       ? await prisma.session.findUnique({
           where: { id: payload.sid },

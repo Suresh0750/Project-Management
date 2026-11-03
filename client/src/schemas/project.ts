@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PRIORITIES, PROJECT_STATUSES } from '@/types/project';
+import { todayInputValue } from '@/utils/format';
 import { lineString, textString } from '@/lib/text';
 
 const projectFields = z.object({
@@ -20,9 +21,21 @@ const projectFields = z.object({
 
 export type ProjectFormValues = z.infer<typeof projectFields>;
 
-/** `requireManager` is true for administrators, who must pick the Project Manager. */
-export function projectFormSchema(requireManager: boolean) {
+/**
+ * `requireManager` is true for administrators, who must pick the Project Manager.
+ * `futureDatesOnly` (create page): the start date and deadline cannot be before today.
+ */
+export function projectFormSchema(requireManager: boolean, futureDatesOnly = false) {
   return projectFields.superRefine((values, ctx) => {
+    if (futureDatesOnly) {
+      const today = todayInputValue();
+      if (values.startDate && values.startDate < today) {
+        ctx.addIssue({ code: 'custom', path: ['startDate'], message: 'Start date cannot be in the past' });
+      }
+      if (values.deadline && values.deadline < today) {
+        ctx.addIssue({ code: 'custom', path: ['deadline'], message: 'Deadline cannot be in the past' });
+      }
+    }
     if (values.startDate && values.deadline && values.deadline < values.startDate) {
       ctx.addIssue({
         code: 'custom',

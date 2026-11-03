@@ -37,6 +37,13 @@ export function deadlineBeforeStart({ startDate, deadline }: DateRange): boolean
 
 const DEADLINE_MESSAGE = 'Deadline cannot be earlier than the start date';
 
+// Nothing new can start or end in the past. One day of slack covers people whose local "today"
+// is still yesterday in UTC (dates are stored as UTC midnight).
+function earliestAllowedDate(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));
+}
+
 export const createProjectSchema = z.object({
   body: z
     .object({
@@ -50,6 +57,13 @@ export const createProjectSchema = z.object({
       managerId: idSchema.optional(),
     })
     .superRefine((body, ctx) => {
+      const earliest = earliestAllowedDate().getTime();
+      if (body.startDate && body.startDate.getTime() < earliest) {
+        ctx.addIssue({ code: 'custom', path: ['startDate'], message: 'Start date cannot be in the past' });
+      }
+      if (body.deadline && body.deadline.getTime() < earliest) {
+        ctx.addIssue({ code: 'custom', path: ['deadline'], message: 'Deadline cannot be in the past' });
+      }
       if (deadlineBeforeStart(body)) {
         ctx.addIssue({ code: 'custom', path: ['deadline'], message: DEADLINE_MESSAGE });
       }

@@ -8,14 +8,18 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import {
+  cancelEmailChange,
+  confirmEmailChange,
   createUser,
   getUser,
   listUsers,
+  resendEmailChangeCode,
   updateUser,
   updateUserStatus,
   type CreateUserPayload,
   type ListUsersParams,
   type UpdateUserPayload,
+  type UpdateUserResult,
 } from '@/features/users/api';
 import type { ApiError } from '@/lib/api/errors';
 import type { AuthUser } from '@/types/auth';
@@ -57,9 +61,31 @@ export function useCreateUser() {
 
 export function useUpdateUser(id: string) {
   const queryClient = useQueryClient();
-  return useMutation<AuthUser, ApiError, UpdateUserPayload>({
+  return useMutation<UpdateUserResult, ApiError, UpdateUserPayload>({
     mutationFn: (payload) => updateUser(id, payload),
+    onSuccess: ({ user }) => syncUser(queryClient, user),
+  });
+}
+
+export function useConfirmEmailChange(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation<AuthUser, ApiError, string>({
+    mutationFn: (otp) => confirmEmailChange(id, otp),
     onSuccess: (user) => syncUser(queryClient, user),
+  });
+}
+
+export function useResendEmailChangeCode(id: string) {
+  return useMutation<{ newEmail: string; resendAfterSeconds: number }, ApiError, void>({
+    mutationFn: () => resendEmailChangeCode(id),
+  });
+}
+
+export function useCancelEmailChange(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation<void, ApiError, void>({
+    mutationFn: () => cancelEmailChange(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: usersKeys.detail(id) }),
   });
 }
 

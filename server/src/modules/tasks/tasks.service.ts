@@ -12,6 +12,7 @@ import type {
   UpdateTaskInput,
   UpdateTaskStatusInput,
 } from './tasks.validation.js';
+import { DUE_DATE_PAST_MESSAGE, isPastDueDate } from './tasks.validation.js';
 
 const PERSON_SELECT = { id: true, name: true, email: true } as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -64,6 +65,14 @@ async function findManageableProject(user: AuthUser, projectId: string) {
 }
 
 /** An assignee must be an active Member of the task's project. */
+// Messages are shown to people as written, so use the labels the app displays, not enum codes.
+const STATUS_LABEL: Record<TaskStatus, string> = {
+  TODO: 'To Do',
+  IN_PROGRESS: 'In Progress',
+  IN_REVIEW: 'In Review',
+  COMPLETED: 'Completed',
+};
+
 async function assertValidAssignee(projectId: string, assigneeId: string) {
   const membership = await prisma.projectMember.findUnique({
     where: { projectId_userId: { projectId, userId: assigneeId } },
@@ -224,6 +233,15 @@ export async function updateTask(user: AuthUser, id: string, input: UpdateTaskIn
     throw new HttpError(403, 'You can only update the description of tasks assigned to you');
   }
 
+  // Keeping a due date that has already passed is fine; moving it to a past date is not.
+  if (
+    input.dueDate &&
+    input.dueDate.getTime() !== task.dueDate?.getTime() &&
+    isPastDueDate(input.dueDate)
+  ) {
+    throw fieldError(400, 'dueDate', DUE_DATE_PAST_MESSAGE);
+  }
+
   const data: Prisma.TaskUncheckedUpdateInput = {};
   if (input.title !== undefined) data.title = input.title;
   if (input.description !== undefined) data.description = input.description;
@@ -285,7 +303,7 @@ export async function updateTaskStatus(user: AuthUser, id: string, input: Update
     if (task.status !== input.status) {
       await recordActivity(tx, {
         action: 'TASK_STATUS_CHANGED',
-        message: `${user.name} moved "${task.title}" from ${task.status} to ${input.status}`,
+        message: `${user.name} moved "${task.title}" from ${STATUS_LABEL[task.status]} to ${STATUS_LABEL[input.status]}`,
         actorId: user.id,
         projectId: task.projectId,
         taskId: id,
@@ -293,7 +311,7 @@ export async function updateTaskStatus(user: AuthUser, id: string, input: Update
       });
       outbox.addNotifications(await notifyUsers(tx, [task.assigneeId, task.creatorId], user.id, {
         type: 'TASK_STATUS_CHANGED',
-        message: `"${task.title}" moved to ${input.status}`,
+        message: `"${task.title}" moved to ${STATUS_LABEL[input.status]}`,
         projectId: task.projectId,
         taskId: id,
       }));
@@ -336,6 +354,17 @@ export async function assignTask(user: AuthUser, id: string, assigneeId: string 
       outbox.addNotifications(await notifyUsers(tx, [assignee.id], user.id, {
         type: 'TASK_ASSIGNED',
         message: `${user.name} assigned you the task "${task.title}"`,
+        projectId: task.projectId,
+        taskId: id,
+      }));
+    }
+    // Whoever held the task until now is told it is no longer theirs.
+    if (task.assigneeId) {
+      outbox.addNotifications(await notifyUsers(tx, [task.assigneeId], user.id, {
+        type: 'TASK_UNASSIGNED',
+        message: assignee
+          ? `The task "${task.title}" was reassigned from you to ${assignee.name}`
+          : `${user.name} removed you from the task "${task.title}"`,
         projectId: task.projectId,
         taskId: id,
       }));

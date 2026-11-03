@@ -38,7 +38,12 @@ export interface OtpTarget {
  * Creates a fresh code (replacing any previous one), emails it, and returns how long the user
  * must wait before asking for another. Throws 429 inside the cooldown window.
  */
-export async function issueOtp(user: OtpTarget): Promise<{ resendAfterSeconds: number }> {
+export async function issueOtp(
+  user: OtpTarget,
+  // Admin changing a verified user's email: the code goes to the NEW address and the change is
+  // applied only once it is entered. Omitted for normal account verification.
+  newEmail?: string,
+): Promise<{ resendAfterSeconds: number }> {
   const cooldown = env.OTP_RESEND_COOLDOWN_SECONDS;
 
   const existing = await prisma.emailVerification.findUnique({ where: { userId: user.id } });
@@ -57,6 +62,7 @@ export async function issueOtp(user: OtpTarget): Promise<{ resendAfterSeconds: n
     expiresAt: new Date(now.getTime() + env.OTP_TTL_MINUTES * 60_000),
     attempts: 0,
     sentAt: now,
+    newEmail: newEmail ?? null,
   };
   await prisma.emailVerification.upsert({
     where: { userId: user.id },
@@ -66,12 +72,13 @@ export async function issueOtp(user: OtpTarget): Promise<{ resendAfterSeconds: n
 
   try {
     await sendMail({
-      to: user.email,
+      to: newEmail ?? user.email,
       ...verificationEmail({
         name: user.name,
-        email: user.email,
+        email: newEmail ?? user.email,
         code,
         ttlMinutes: env.OTP_TTL_MINUTES,
+        purpose: newEmail ? 'email-change' : 'signup',
       }),
     });
   } catch (error) {
@@ -88,7 +95,10 @@ export async function issueOtp(user: OtpTarget): Promise<{ resendAfterSeconds: n
  * Checks a submitted code. The attempt counter is incremented atomically *before* comparing, so
  * parallel guesses cannot exceed the limit. A correct code is consumed (single use).
  */
-export async function consumeOtp(userId: string, code: string): Promise<void> {
+export async function consumeOtp(
+  userId: string,
+  code: string,
+): Promise<{ newEmail: string | null }> {
   const record = await prisma.emailVerification.findUnique({ where: { userId } });
   if (!record) throw fieldError(400, GENERIC_INVALID);
 
@@ -119,4 +129,5 @@ export async function consumeOtp(userId: string, code: string): Promise<void> {
   }
 
   await prisma.emailVerification.deleteMany({ where: { userId } });
+  return { newEmail: record.newEmail };
 }

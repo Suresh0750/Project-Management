@@ -51,7 +51,11 @@ enum NotificationType {
   TASK_ASSIGNED
   TASK_STATUS_CHANGED
   TASK_COMMENT
+  TASK_UNASSIGNED
   PROJECT_MEMBER_ADDED
+  PROJECT_MEMBER_REMOVED
+  PROJECT_MANAGER_ASSIGNED
+  PROJECT_MANAGER_REMOVED
 }
 
 // USER
@@ -97,6 +101,8 @@ model EmailVerification {
   userId    String   @unique
   // HMAC of the 6-digit code; the code itself is never stored.
   codeHash  String
+  // null: confirms a new account. Set: confirms this address as the user's NEW email (admin edit).
+  newEmail  String?  @db.VarChar(254)
   expiresAt DateTime
   attempts  Int      @default(0)
   sentAt    DateTime @default(now())
