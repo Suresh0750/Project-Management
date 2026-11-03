@@ -75,3 +75,8 @@ export type UpdateProfileInput = z.infer<typeof updateProfileSchema>['body'];
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>['body'];
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>['body'];
 export type ResendOtpInput = z.infer<typeof resendOtpSchema>['body'];
+
+/** Refresh and logout read the refresh token from its cookie, or from the body for bearer clients. */
+export const optionalRefreshTokenSchema = z.object({
+  body: z.object({ refreshToken: z.string().trim().min(1).max(4096).optional() }).optional(),
+});

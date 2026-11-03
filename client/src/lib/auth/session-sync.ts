@@ -1,4 +1,6 @@
 
+import { TOKEN_STORAGE_KEY } from '@/lib/auth/token-store';
+
 const CHANNEL_NAME = 'projectflow:auth';
 
 interface AuthMessage {
@@ -22,13 +24,24 @@ export function broadcastLogout(): void {
   }
 }
 
-/** Runs `handler` when another tab logs out. Returns a function that stops listening. */
-export function onLogoutElsewhere(handler: () => void): () => void {
-  if (!supported()) return () => undefined;
 
-  const channel = new BroadcastChannel(CHANNEL_NAME);
-  channel.onmessage = (event: MessageEvent<AuthMessage>) => {
-    if (event.data?.type === 'logout') handler();
+export function onLogoutElsewhere(handler: () => void): () => void {
+  const channel = supported() ? new BroadcastChannel(CHANNEL_NAME) : null;
+  if (channel) {
+    channel.onmessage = (event: MessageEvent<AuthMessage>) => {
+      if (event.data?.type === 'logout') handler();
+    };
+  }
+
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === TOKEN_STORAGE_KEY && event.oldValue !== null && event.newValue === null) {
+      handler();
+    }
   };
-  return () => channel.close();
+  window.addEventListener('storage', onStorage);
+
+  return () => {
+    channel?.close();
+    window.removeEventListener('storage', onStorage);
+  };
 }
