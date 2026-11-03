@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { PasswordField } from '@/components/ui/password-field';
+import { PasswordRequirements } from '@/components/ui/password-requirements';
 import { useToast } from '@/components/ui/toast-provider';
 import { useResetPassword } from '@/features/auth/hooks';
 import { resetPasswordSchema, type ResetPasswordValues } from '@/schemas/auth';
@@ -24,11 +25,14 @@ export function ResetPasswordForm() {
     register,
     handleSubmit,
     setError,
+    control,
     formState: { errors },
   } = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: { password: '', confirmPassword: '' },
   });
+
+  const password = useWatch({ control, name: 'password' });
 
   if (!token) {
     return (
@@ -76,10 +80,10 @@ export function ResetPasswordForm() {
       <PasswordField
         label="New password"
         autoComplete="new-password"
-        hint="At least 8 characters with upper and lower case letters, a number and a symbol."
         error={errors.password?.message}
         {...register('password')}
       />
+      <PasswordRequirements value={password} />
 
       <PasswordField
         label="Confirm new password"
