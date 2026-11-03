@@ -2,6 +2,9 @@ import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { publicEnv } from '@/lib/env';
 import { ApiError, isAccountDeactivated, toApiError } from '@/lib/api/errors';
 import { endSession, isSessionEnded } from '@/lib/auth/session-guard';
+import { clearTokens, getTokens, setTokens } from '@/lib/auth/token-store';
+import type { ApiSuccess } from '@/lib/api/types';
+import type { AuthUserPayload } from '@/types/auth';
 
 export const apiClient = axios.create({
   baseURL: publicEnv.apiUrl,
@@ -12,8 +15,7 @@ export const apiClient = axios.create({
   },
 });
 
-// Once the account is deactivated the page is already on its way to /login. Anything still
-// trying to call the API is refused here, before it reaches the network.
+
 apiClient.interceptors.request.use((config) => {
   if (isSessionEnded()) {
     throw new ApiError(
@@ -22,39 +24,51 @@ apiClient.interceptors.request.use((config) => {
       { code: 'ACCOUNT_DEACTIVATED' },
     );
   }
+
+  const tokens = getTokens();
+  if (tokens) config.headers.set('Authorization', `Bearer ${tokens.accessToken}`);
+
   return config;
 });
 
-// These calls answer "deactivated" for someone typing credentials on the form itself. The form
-// shows that message in place, so it must not trigger the sign-out redirect.
+
 const CREDENTIAL_PATHS = ['/auth/login', '/auth/verify-email'];
 
-// Auth endpoints answer 401 for legitimate reasons (bad credentials, no session), so they
-// must never trigger a refresh-and-retry.
 const NO_REFRESH_PATHS = ['/auth/login', '/auth/logout', '/auth/refresh'];
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 
 let refreshInFlight: Promise<void> | null = null;
 
-/** Single-flight: concurrent 401s share one refresh call (refresh tokens rotate). */
-function refreshSession(): Promise<void> {
-  refreshInFlight ??= apiClient
-    .post('/auth/refresh')
-    .then(() => undefined)
-    .finally(() => {
-      refreshInFlight = null;
-    });
+async function requestRefresh(): Promise<void> {
+  const tokens = getTokens();
+
+  try {
+
+    const { data } = await apiClient.post<ApiSuccess<AuthUserPayload>>(
+      '/auth/refresh',
+      tokens ? { refreshToken: tokens.refreshToken } : undefined,
+      tokens ? { headers: { 'X-Auth-Transport': 'bearer' } } : undefined,
+    );
+    if (data.data.tokens) setTokens(data.data.tokens);
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) clearTokens();
+    throw error;
+  }
+}
+
+export function refreshSession(): Promise<void> {
+  refreshInFlight ??= requestRefresh().finally(() => {
+    refreshInFlight = null;
+  });
   return refreshInFlight;
 }
 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: unknown) => {
-    // Cancelled requests are expected (e.g. unmounted components) and must stay distinguishable.
     if (axios.isCancel(error)) throw error;
 
-    // Deactivated: end the session immediately. No session re-check, no refresh attempt.
     const apiError = toApiError(error);
     if (isAccountDeactivated(apiError)) {
       const url = axios.isAxiosError(error) ? error.config?.url : undefined;
@@ -74,9 +88,8 @@ apiClient.interceptors.response.use(
       config._retried = true;
       try {
         await refreshSession();
-      } catch {
-        // Session truly expired: surface the original 401.
-        throw toApiError(error);
+      } catch (refreshError) {
+        throw refreshError instanceof ApiError && refreshError.isNetworkError ? refreshError : apiError;
       }
       // Errors from the retried call are converted by this same interceptor.
       return apiClient.request(config);

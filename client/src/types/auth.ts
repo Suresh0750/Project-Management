@@ -14,6 +14,13 @@ export interface AuthUser {
   updatedAt: string;
 }
 
+/** Only present when the browser asked for bearer mode (see lib/auth/transport.ts). */
+export interface IssuedTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
 export interface AuthUserPayload {
   user: AuthUser;
+  tokens?: IssuedTokens;
 }

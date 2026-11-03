@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { prisma } from '../../prisma/client.js';
 import { accountDeactivated } from '../utils/accountErrors.js';
+import { extractBearerToken } from '../utils/bearer.js';
 import { clearAuthCookies } from '../utils/cookies.js';
 import { HttpError } from '../utils/httpError.js';
 import { verifyAccessToken } from '../utils/jwt.js';
@@ -16,9 +17,10 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   };
 
   try {
+    // An explicit Authorization header wins: a client that sends one is deliberately using bearer
+    // tokens, and a stale cookie left over from an earlier session must not override it.
     const cookieToken = req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined;
-    const headerToken = extractBearerToken(req);
-    const token = cookieToken ?? headerToken;
+    const token = extractBearerToken(req) ?? cookieToken;
 
     if (!token) throw new HttpError(401, 'Authentication required');
 
@@ -55,10 +57,4 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   } catch (err) {
     next(err);
   }
-}
-
-function extractBearerToken(req: Request): string | undefined {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) return undefined;
-  return authHeader.slice(7);
 }
