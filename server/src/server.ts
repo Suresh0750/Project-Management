@@ -1,25 +1,26 @@
 import 'dotenv/config';
 import './config/env.js';
 
-import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { startCleanupJobs } from './jobs/cleanup.js';
 import { closeSocket, initSocket } from './realtime/socket.js';
 
 const app = createApp();
-const httpServer = createServer(app);
-initSocket(httpServer);
 
 const PORT = process.env.PORT || 3000;
 
 let stopCleanup: () => void = () => undefined;
 
-httpServer.listen(PORT, () => {
+// Express creates the HTTP server (app.listen is http.createServer(app).listen under the hood).
+const httpServer = app.listen(PORT, () => {
   console.info(
     `API listening on http://localhost:${PORT} (${process.env.NODE_ENV})`
   );
   stopCleanup = startCleanupJobs();
 });
+
+// Socket.IO attaches to that same server, so REST and WebSocket share one port.
+initSocket(httpServer);
 
 const shutdown = (): void => {
   console.info('Shutting down server...');
