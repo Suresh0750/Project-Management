@@ -1,4 +1,5 @@
 import { prisma } from '../../prisma/client.js';
+import { deleteExpiredSessions } from '../modules/auth/session.service.js';
 
 const CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
 
@@ -15,6 +16,8 @@ async function runCleanup(): Promise<void> {
   try {
     const removed = await deleteExpiredOtps();
     if (removed > 0) console.info(`[cleanup] removed ${removed} expired verification code(s)`);
+    const sessions = await deleteExpiredSessions();
+    if (sessions > 0) console.info(`[cleanup] removed ${sessions} expired session(s)`);
   } catch (error) {
     // A failed sweep must never take the API down; the next one will retry.
     console.error('[cleanup] failed to remove expired verification codes', error);

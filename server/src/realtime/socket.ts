@@ -14,7 +14,8 @@ interface SocketUser {
 let io: Server | null = null;
 
 const userRoom = (userId: string) => `user:${userId}`;
-const projectRoom = (projectId: string) => `project:${projectId}`;
+const sessionRoom = (sessionId: string) => `session:${sessionId}`;
+const projectRoom =(projectId: string) => `project:${projectId}`;
 const ADMIN_ROOM = 'role:ADMIN';
 
 function readCookie(header: string | undefined, name: string): string | undefined {
@@ -57,15 +58,30 @@ async function authenticateSocket(socket: Socket, next: (error?: Error) => void)
     }
 
     const payload = verifyAccessToken(token);
-    const user = await prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, role: true, isActive: true, tokenVersion: true },
-    });
-    if (!user || !user.isActive || user.tokenVersion !== payload.tv) {
+    const session = payload.sid
+      ? await prisma.session.findUnique({
+          where: { id: payload.sid },
+          select: {
+            userId: true,
+            expiresAt: true,
+            user: { select: { id: true, role: true, isActive: true, tokenVersion: true } },
+          },
+        })
+      : null;
+    const user = session?.user;
+    if (
+      !session ||
+      session.userId !== payload.sub ||
+      session.expiresAt <= new Date() ||
+      !user ||
+      !user.isActive ||
+      user.tokenVersion !== payload.tv
+    ) {
       next(new Error('unauthorized'));
       return;
     }
 
+    socket.data.sessionId = payload.sid;
     socket.data.user = { id: user.id, role: user.role } satisfies SocketUser;
     socket.data.expiresAtMs = (payload.exp ?? 0) * 1000;
     next();
@@ -95,6 +111,7 @@ async function onConnection(socket: Socket): Promise<void> {
 
   // Rooms are decided here from the database. The client can never ask to join one.
   await socket.join(userRoom(user.id));
+  await socket.join(sessionRoom(socket.data.sessionId as string));
   if (user.role === Role.ADMIN) await socket.join(ADMIN_ROOM);
   for (const projectId of await projectIdsFor(user)) await socket.join(projectRoom(projectId));
 
@@ -142,6 +159,11 @@ export function joinProjectRoom(userId: string, projectId: string): void {
 
 export function leaveProjectRoom(userId: string, projectId: string): void {
   io?.in(userRoom(userId)).socketsLeave(projectRoom(projectId));
+}
+
+/** Ends the live connections of one device (logout), leaving the user's other devices alone. */
+export function disconnectSessionSockets(sessionId: string): void {
+  io?.in(sessionRoom(sessionId)).disconnectSockets(true);
 }
 
 /** Ends every live connection of a user (e.g. after their sessions were revoked). */

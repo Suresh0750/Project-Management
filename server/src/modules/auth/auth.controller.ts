@@ -5,7 +5,7 @@ import { HttpError } from '../../utils/httpError.js';
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '../../constants.js';
 import { extractBearerToken } from '../../middlewares/authenticate.js';
 import * as authService from './auth.service.js';
-import { disconnectUserSockets } from '../../realtime/socket.js';
+import { disconnectSessionSockets, disconnectUserSockets } from '../../realtime/socket.js';
 import type {
   ChangePasswordInput,
   LoginInput,
@@ -41,6 +41,7 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
   try {
     const { user, accessToken, refreshToken } = await authService.verifyEmail(
       req.body as VerifyEmailInput,
+      req.get('user-agent'),
     );
     setAuthCookies(res, accessToken, refreshToken);
     res.status(200).json(success({ user, tokens: tokensBody(accessToken, refreshToken) }, 'Email verified successfully'));
@@ -62,6 +63,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
   try {
     const { user, accessToken, refreshToken } = await authService.login(
       req.body as LoginInput,
+      req.get('user-agent'),
     );
     setAuthCookies(res, accessToken, refreshToken);
     res.status(200).json(success({ user, tokens: tokensBody(accessToken, refreshToken) }, 'Login successful'));
@@ -73,14 +75,14 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 // Public on purpose: a user whose access token has expired must still be able to log out.
 export async function logout(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = await authService.logout(
+    const ended = await authService.logout(
       extractBearerToken(req) ?? (req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined),
       (req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined) ?? bodyString(req, 'refreshToken'),
     );
     clearAuthCookies(res);
-    // Every session of this user was just revoked, so end their live connections as well. Other
-    // devices then notice at once instead of on their next click.
-    if (userId) disconnectUserSockets(userId);
+    // Only this device's session ended: close its live connections, leave the user's other
+    // devices connected.
+    if (ended) disconnectSessionSockets(ended.sessionId);
     res.status(200).json(success(null, 'Logged out successfully'));
   } catch (err) {
     next(err);
@@ -130,6 +132,7 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     const { user, accessToken, refreshToken } = await authService.changePassword(
       req.user!.id,
       req.body as ChangePasswordInput,
+      req.get('user-agent'),
     );
     setAuthCookies(res, accessToken, refreshToken);
     // Other devices were just signed out; end their live connections too.

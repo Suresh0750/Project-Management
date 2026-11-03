@@ -1,5 +1,6 @@
 import { Role } from '@prisma/client';
 import { z } from 'zod';
+import { lineString } from '../../utils/text.js';
 
 const passwordSchema = z
   .string()
@@ -10,11 +11,12 @@ const passwordSchema = z
   .regex(/[0-9]/, 'Password must contain at least one number')
   .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
 
-const nameSchema = z
-  .string()
-  .trim()
-  .min(2, 'Name must be at least 2 characters')
-  .max(100, 'Name must be at most 100 characters');
+const nameSchema = lineString().pipe(
+  z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name must be at most 100 characters'),
+);
 
 const emailSchema = z
   .string()

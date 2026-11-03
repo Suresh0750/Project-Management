@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { lineString } from '@/lib/text';
 
 const email = z
   .string()
@@ -23,11 +24,12 @@ export const loginSchema = z.object({
 
 export const registerSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(2, 'Name must be at least 2 characters')
-      .max(100, 'Name must be at most 100 characters'),
+    name: lineString().pipe(
+      z
+        .string()
+        .min(2, 'Name must be at least 2 characters')
+        .max(100, 'Name must be at most 100 characters'),
+    ),
     email,
     password: passwordPolicy,
     confirmPassword: z.string().min(1, 'Confirm your password'),

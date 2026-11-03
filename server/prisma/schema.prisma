@@ -62,7 +62,8 @@ model User {
   passwordHash    String
   role            Role      @default(MEMBER)
   isActive        Boolean   @default(true)
-  // Incremented on logout; tokens carrying an older value are rejected.
+  // Incremented to sign the user out of EVERY device (password change, deactivation).
+  // A normal logout only ends one Session.
   tokenVersion    Int       @default(0)
   // null until the email address is proven (OTP) or an admin created the account.
   emailVerifiedAt DateTime?
@@ -70,6 +71,7 @@ model User {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   emailVerification EmailVerification?
+  sessions          Session[]
 
   createdProjects Project[]       @relation("ProjectCreator")
   managedProjects Project[]       @relation("ProjectManager")
@@ -100,6 +102,22 @@ model EmailVerification {
   sentAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One row per signed-in browser/device. Both JWTs carry its id (`sid`); deleting the row ends
+// only that device's login.
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  userAgent  String?  @db.VarChar(255)
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  expiresAt  DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // PROJECT

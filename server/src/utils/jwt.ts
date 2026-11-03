@@ -9,22 +9,23 @@ export function signAccessToken(payload: {
   email: string;
   role: Role;
   tokenVersion: number;
+  sessionId: string;
 }): string {
   const options: jwt.SignOptions = {
     expiresIn: env.JWT_ACCESS_EXPIRES_IN as StringValue,
   };
   return jwt.sign(
-    { sub: payload.sub, email: payload.email, role: payload.role, tv: payload.tokenVersion },
+    { sub: payload.sub, sid: payload.sessionId, email: payload.email, role: payload.role, tv: payload.tokenVersion },
     env.JWT_ACCESS_SECRET,
     options,
   );
 }
 
-export function signRefreshToken(sub: string, tokenVersion: number): string {
+export function signRefreshToken(sub: string, tokenVersion: number, sessionId: string): string {
   const options: jwt.SignOptions = {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
   };
-  return jwt.sign({ sub, tv: tokenVersion }, env.JWT_REFRESH_SECRET, options);
+  return jwt.sign({ sub, sid: sessionId, tv: tokenVersion }, env.JWT_REFRESH_SECRET, options);
 }
 
 // Verify token
