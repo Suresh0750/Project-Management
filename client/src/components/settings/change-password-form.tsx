@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { PasswordField } from '@/components/ui/password-field';
+import { PasswordRequirements } from '@/components/ui/password-requirements';
 import { useToast } from '@/components/ui/toast-provider';
 import { useChangePassword } from '@/features/auth/hooks';
 import { changePasswordSchema, type ChangePasswordValues } from '@/schemas/auth';
@@ -24,12 +25,15 @@ export function ChangePasswordForm() {
     handleSubmit,
     setError,
     reset,
+    control,
     formState: { errors, isDirty },
   } = useForm<ChangePasswordValues>({
     resolver: zodResolver(changePasswordSchema),
     mode: 'onTouched',
     defaultValues: EMPTY,
   });
+
+  const newPassword = useWatch({ control, name: 'newPassword' });
 
   // Never leave typed passwords behind when the page goes away.
   useEffect(() => () => reset(EMPTY), [reset]);
@@ -83,10 +87,10 @@ export function ChangePasswordForm() {
         <PasswordField
           label="New password"
           autoComplete="new-password"
-          hint="At least 8 characters with upper and lower case letters, a number and a symbol."
           error={errors.newPassword?.message}
           {...register('newPassword')}
         />
+        <PasswordRequirements value={newPassword} />
         <PasswordField
           label="Confirm new password"
           autoComplete="new-password"

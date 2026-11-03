@@ -2,11 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { PasswordField } from '@/components/ui/password-field';
+import { PasswordRequirements } from '@/components/ui/password-requirements';
+import { generateMemorablePassword } from '@/utils/password';
 import { TextField } from '@/components/ui/text-field';
 import { useRegister } from '@/features/auth/hooks';
 import { registerSchema, type RegisterValues } from '@/schemas/auth';
@@ -18,6 +20,7 @@ const EMPTY: RegisterValues = { name: '', email: '', password: '', confirmPasswo
 export function RegisterForm() {
   const router = useRouter();
   const registerAccount = useRegister();
+  const [passwordsVisible, setPasswordsVisible] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -25,6 +28,9 @@ export function RegisterForm() {
     handleSubmit,
     setError,
     reset,
+    control,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -34,6 +40,20 @@ export function RegisterForm() {
 
   // Never leave typed passwords behind when the page goes away.
   useEffect(() => () => reset(EMPTY), [reset]);
+
+  // Fills both password fields, so the person only has to remember what was suggested.
+  const fillGeneratedPassword = () => {
+    const generated = generateMemorablePassword(getValues('name'), getValues('email'));
+    if (!generated) {
+      setError('name', { message: 'Enter your name or email first, then ask for a suggestion' });
+      return;
+    }
+    setValue('password', generated, { shouldValidate: true, shouldDirty: true });
+    setValue('confirmPassword', generated, { shouldValidate: true, shouldDirty: true });
+    setPasswordsVisible(true);
+  };
+
+  const password = useWatch({ control, name: 'password' });
 
   const goToVerification = (email: string) =>
     router.push(`/verify-email?email=${encodeURIComponent(email)}&sent=1`);
@@ -89,13 +109,24 @@ export function RegisterForm() {
       <PasswordField
         label="Password"
         autoComplete="new-password"
-        hint="At least 8 characters with upper and lower case letters, a number and a symbol."
+        visible={passwordsVisible}
+        onVisibleChange={setPasswordsVisible}
         error={errors.password?.message}
         {...register('password')}
       />
+      <PasswordRequirements value={password} />
+      <button
+        type="button"
+        onClick={fillGeneratedPassword}
+        className="cursor-pointer text-sm font-medium text-primary hover:underline"
+      >
+        Suggest a password from my name and email
+      </button>
       <PasswordField
         label="Confirm password"
         autoComplete="new-password"
+        visible={passwordsVisible}
+        onVisibleChange={setPasswordsVisible}
         error={errors.confirmPassword?.message}
         {...register('confirmPassword')}
       />

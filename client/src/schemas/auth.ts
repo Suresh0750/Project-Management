@@ -7,19 +7,34 @@ const email = z
   .min(1, 'Email is required')
   .pipe(z.email('Enter a valid email address'));
 
-// Mirrors the server's password policy so users see errors before submitting.
+// Mirrors the server's password policy (server/src/utils/passwordPolicy.ts) so users see errors
+// before submitting. The same list feeds the live checklist under the password fields.
+export const PASSWORD_RULES = [
+  { id: 'length', label: '8+ characters', message: 'Password must be at least 8 characters', test: (v: string) => v.length >= 8 },
+  { id: 'upper', label: 'One uppercase letter', message: 'Include at least one uppercase letter', test: (v: string) => /[A-Z]/.test(v) },
+  { id: 'lower', label: 'One lowercase letter', message: 'Include at least one lowercase letter', test: (v: string) => /[a-z]/.test(v) },
+  { id: 'number', label: 'One number', message: 'Include at least one number', test: (v: string) => /[0-9]/.test(v) },
+  { id: 'special', label: 'One special character', message: 'Include at least one special character', test: (v: string) => /[^A-Za-z0-9]/.test(v) },
+] as const;
+
 export const passwordPolicy = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
   .max(72, 'Password must be at most 72 characters')
-  .regex(/[A-Z]/, 'Include at least one uppercase letter')
-  .regex(/[a-z]/, 'Include at least one lowercase letter')
-  .regex(/[0-9]/, 'Include at least one number')
-  .regex(/[^A-Za-z0-9]/, 'Include at least one special character');
+  .superRefine((value, ctx) => {
+    // Report the first rule that is not met, so the message is always one clear next step.
+    const unmet = PASSWORD_RULES.find((rule) => !rule.test(value));
+    if (unmet) ctx.addIssue({ code: 'custom', message: unmet.message });
+  });
 
 export const loginSchema = z.object({
   email,
-  password: z.string().min(1, 'Password is required'),
+  // Login only checks the shape, never the strength rules: accounts created before a rule
+  // existed must still be able to sign in. A blank (all-space) password can never be valid.
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .max(72, 'Password must be at most 72 characters')
+    .refine((value) => value.trim().length > 0, 'Password is required'),
 });
 
 export const registerSchema = z

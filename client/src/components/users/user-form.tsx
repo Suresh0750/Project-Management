@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Copy, Wand2 } from 'lucide-react';
 import { Alert } from '@/components/ui/alert';
@@ -18,7 +18,8 @@ import {
   editUserSchema,
   type UserFormValues,
 } from '@/schemas/user';
-import { generatePassword } from '@/utils/password';
+import { PasswordRequirements } from '@/components/ui/password-requirements';
+import { generateMemorablePassword } from '@/utils/password';
 
 const ROLE_OPTIONS = ASSIGNABLE_ROLES.map((role) => ({ value: role, label: ROLE_LABEL[role] }));
 const FIELDS = ['name', 'email', 'role', 'password'] as const;
@@ -51,6 +52,7 @@ export function UserForm({
     setError,
     setValue,
     getValues,
+    control,
     reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<UserFormValues>({
@@ -71,6 +73,8 @@ export function UserForm({
     },
     [reset],
   );
+
+  const password = useWatch({ control, name: 'password' });
 
   const submit = handleSubmit(async (values) => {
     setFormError(null);
@@ -104,7 +108,12 @@ export function UserForm({
   });
 
   const fillGeneratedPassword = () => {
-    setValue('password', generatePassword(), { shouldValidate: true, shouldDirty: true });
+    const generated = generateMemorablePassword(getValues('name'), getValues('email'));
+    if (!generated) {
+      toast.error('Enter the name or email first, then generate the password.');
+      return;
+    }
+    setValue('password', generated, { shouldValidate: true, shouldDirty: true });
     setPasswordVisible(true);
   };
 
@@ -159,14 +168,14 @@ export function UserForm({
             autoComplete="new-password"
             visible={passwordVisible}
             onVisibleChange={setPasswordVisible}
-            hint="At least 8 characters with upper and lower case letters, a number and a symbol."
             error={errors.password?.message}
             {...register('password')}
           />
+          <PasswordRequirements value={password ?? ''} />
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={fillGeneratedPassword}>
               <Wand2 className="size-4" aria-hidden="true" />
-              Generate secure password
+              Generate from name & email
             </Button>
             <Button variant="ghost" onClick={copyPassword}>
               <Copy className="size-4" aria-hidden="true" />
