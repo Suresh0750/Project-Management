@@ -1,16 +1,16 @@
 import { Priority, ProjectStatus } from '@prisma/client';
 import { z } from 'zod';
+import { lineString, textString } from '../../utils/text.js';
 
-const nameSchema = z
-  .string()
-  .trim()
-  .min(2, 'Project name must be at least 2 characters')
-  .max(120, 'Project name must be at most 120 characters');
+const nameSchema = lineString().pipe(
+  z
+    .string()
+    .min(2, 'Project name must be at least 2 characters')
+    .max(120, 'Project name must be at most 120 characters'),
+);
 
-const descriptionSchema = z
-  .string()
-  .trim()
-  .max(5000, 'Description must be at most 5000 characters')
+const descriptionSchema = textString()
+  .pipe(z.string().max(5000, 'Description must be at most 5000 characters'))
   .nullable()
   .transform((value) => (value === '' ? null : value));
 

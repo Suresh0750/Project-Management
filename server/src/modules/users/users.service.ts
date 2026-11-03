@@ -3,6 +3,7 @@ import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
 import { env } from '../../config/env.js';
 import { disconnectUserSockets } from '../../realtime/socket.js';
+import { endAllSessions } from '../auth/session.service.js';
 import { HttpError } from '../../utils/httpError.js';
 import { accountStatusEmail } from '../../utils/emailTemplates.js';
 import { sendMail } from '../../utils/mailer.js';
@@ -143,7 +144,10 @@ export async function updateUserStatus(id: string, isActive: boolean, requesterI
 
   if (before.isActive !== isActive) {
     // Open tabs and devices learn about it immediately instead of on their next click.
-    if (!isActive) disconnectUserSockets(id);
+    if (!isActive) {
+      await endAllSessions(id);
+      disconnectUserSockets(id);
+    }
 
     // Best effort and off the request path: a slow or failing mail server must never undo or
     // delay the administrator's action.

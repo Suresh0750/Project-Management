@@ -1,18 +1,15 @@
 import { Priority, TaskStatus } from '@prisma/client';
 import { z } from 'zod';
+import { lineString, textString } from '../../utils/text.js';
 
 const idSchema = z.string().trim().min(1, 'ID is required').max(64, 'Invalid ID');
 
-const titleSchema = z
-  .string()
-  .trim()
-  .min(1, 'Title is required')
-  .max(200, 'Title must be at most 200 characters');
+const titleSchema = lineString().pipe(
+  z.string().min(1, 'Title is required').max(200, 'Title must be at most 200 characters'),
+);
 
-const descriptionSchema = z
-  .string()
-  .trim()
-  .max(5000, 'Description must be at most 5000 characters')
+const descriptionSchema = textString()
+  .pipe(z.string().max(5000, 'Description must be at most 5000 characters'))
   .nullable()
   .transform((value) => (value === '' ? null : value));
 
@@ -88,11 +85,12 @@ export const taskIdParamSchema = z.object({ params: z.object({ id: idSchema }) }
 export const addCommentSchema = z.object({
   params: z.object({ id: idSchema }),
   body: z.object({
-    content: z
-      .string()
-      .trim()
-      .min(1, 'Comment cannot be empty')
-      .max(2000, 'Comment must be at most 2000 characters'),
+    content: textString().pipe(
+      z
+        .string()
+        .min(1, 'Comment cannot be empty')
+        .max(2000, 'Comment must be at most 2000 characters'),
+    ),
   }),
 });
 

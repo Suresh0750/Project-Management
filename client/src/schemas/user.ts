@@ -1,15 +1,17 @@
 import { z } from 'zod';
 import { passwordPolicy } from '@/schemas/auth';
 import { ROLES, type Role } from '@/types/auth';
+import { lineString } from '@/lib/text';
 
 export const ASSIGNABLE_ROLES = ['PROJECT_MANAGER', 'MEMBER'] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
-const name = z
-  .string()
-  .trim()
-  .min(2, 'Name must be at least 2 characters')
-  .max(100, 'Name must be at most 100 characters');
+const name = lineString().pipe(
+  z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name must be at most 100 characters'),
+);
 
 const email = z
   .string()

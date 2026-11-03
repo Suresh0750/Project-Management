@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { lineString } from '../../utils/text.js';
 
 const passwordSchema = z
   .string()
@@ -11,7 +12,7 @@ const passwordSchema = z
 
 export const registerSchema = z.object({
   body: z.object({
-    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
+    name: lineString().pipe(z.string().min(2, 'Name must be at least 2 characters').max(100)),
     email: z.string().trim().toLowerCase().email('Invalid email address'),
     password: z
       .string()
@@ -47,7 +48,9 @@ export const resendOtpSchema = z.object({
 export const updateProfileSchema = z.object({
   body: z
     .object({
-      name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100).optional(),
+      name: lineString()
+        .pipe(z.string().min(2, 'Name must be at least 2 characters').max(100))
+        .optional(),
       email: z.string().trim().toLowerCase().max(254).email('Invalid email address').optional(),
       // Required only when the email address changes.
       currentPassword: z.string().min(1).max(72).optional(),

@@ -1,13 +1,15 @@
 import { z } from 'zod';
 import { PRIORITIES, PROJECT_STATUSES } from '@/types/project';
+import { lineString, textString } from '@/lib/text';
 
 const projectFields = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, 'Project name must be at least 2 characters')
-    .max(120, 'Project name must be at most 120 characters'),
-  description: z.string().trim().max(5000, 'Description must be at most 5000 characters'),
+  name: lineString().pipe(
+    z
+      .string()
+      .min(2, 'Project name must be at least 2 characters')
+      .max(120, 'Project name must be at most 120 characters'),
+  ),
+  description: textString().pipe(z.string().max(5000, 'Description must be at most 5000 characters')),
   priority: z.enum(PRIORITIES, { message: 'Select a priority' }),
   status: z.enum(PROJECT_STATUSES, { message: 'Select a status' }),
   // <input type="date"> values: "YYYY-MM-DD" or "" when empty.

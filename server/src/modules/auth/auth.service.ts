@@ -3,15 +3,11 @@ import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
 import { accountDeactivated } from '../../utils/accountErrors.js';
 import { HttpError } from '../../utils/httpError.js';
-import {
-  signAccessToken,
-  signRefreshToken,
-  verifyAccessToken,
-  verifyRefreshToken,
-} from '../../utils/jwt.js';
+import { verifyAccessToken, verifyRefreshToken } from '../../utils/jwt.js';
 import { env } from '../../config/env.js';
 import { SAFE_USER_SELECT } from '../../constants.js';
 import { consumeOtp, issueOtp } from './otp.service.js';
+import { endAllSessions, endSession, renewSession, startSession } from './session.service.js';
 import type {
   ChangePasswordInput,
   LoginInput,
@@ -58,7 +54,7 @@ export async function register(input: RegisterInput) {
 }
 
 // ─── Verify email (OTP) ───────────────────────────────────────────────────────
-export async function verifyEmail(input: VerifyEmailInput) {
+export async function verifyEmail(input: VerifyEmailInput, userAgent?: string) {
   const invalid = () =>
     new HttpError(400, 'The code is invalid or has expired. Request a new one.', [
       { path: 'otp', message: 'The code is invalid or has expired. Request a new one.' },
@@ -81,13 +77,10 @@ export async function verifyEmail(input: VerifyEmailInput) {
 
   // Proving the mailbox is the sign-in, so the user lands in the app without logging in again.
   const { tokenVersion, ...safeUser } = verified;
-  const accessToken = signAccessToken({
-    sub: safeUser.id,
-    email: safeUser.email,
-    role: safeUser.role,
-    tokenVersion,
-  });
-  const refreshToken = signRefreshToken(safeUser.id, tokenVersion);
+  const { accessToken, refreshToken } = await startSession(
+    { id: safeUser.id, email: safeUser.email, role: safeUser.role, tokenVersion },
+    userAgent,
+  );
 
   return { user: safeUser, accessToken, refreshToken };
 }
@@ -108,7 +101,7 @@ export async function resendOtp(email: string) {
 }
 
 // ─── Login ────────────────────────────────────────────────────────────────────
-export async function login(input: LoginInput) {
+export async function login(input: LoginInput, userAgent?: string) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 
   // Use a constant-time comparison path even on not-found to prevent timing attacks
@@ -136,13 +129,7 @@ export async function login(input: LoginInput) {
     ]);
   }
 
-  const accessToken = signAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    tokenVersion: user.tokenVersion,
-  });
-  const refreshToken = signRefreshToken(user.id, user.tokenVersion);
+  const { accessToken, refreshToken } = await startSession(user, userAgent);
 
   const safeUser = {
     id: user.id,
@@ -167,10 +154,21 @@ export async function refresh(refreshToken: string) {
     throw new HttpError(401, 'Invalid or expired refresh token');
   }
 
-  const record = await prisma.user.findUnique({
-    where: { id: payload.sub },
-    select: { ...SAFE_USER_SELECT, tokenVersion: true },
-  });
+  // Tokens from before sessions existed carry no sid: the user simply logs in again once.
+  const session = payload.sid
+    ? await prisma.session.findUnique({
+        where: { id: payload.sid },
+        select: {
+          userId: true,
+          expiresAt: true,
+          user: { select: { ...SAFE_USER_SELECT, tokenVersion: true } },
+        },
+      })
+    : null;
+  if (!session || session.userId !== payload.sub || session.expiresAt <= new Date()) {
+    throw new HttpError(401, 'Session has been revoked');
+  }
+  const record = session.user;
 
   if (!record) throw new HttpError(401, 'User not found');
   if (!record.isActive) throw accountDeactivated();
@@ -178,44 +176,40 @@ export async function refresh(refreshToken: string) {
   if (payload.tv !== record.tokenVersion) throw new HttpError(401, 'Session has been revoked');
 
   const { tokenVersion, ...user } = record;
-  const newAccessToken = signAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    tokenVersion,
-  });
-  const newRefreshToken = signRefreshToken(user.id, tokenVersion);
+  const tokens = await renewSession({ ...user, tokenVersion }, payload.sid);
 
-  return { user, accessToken: newAccessToken, refreshToken: newRefreshToken };
+  return { user, ...tokens };
 }
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
-// Bumping tokenVersion invalidates all access and refresh tokens for the user.
+// Ends only the session of the device that logs out; the user's other devices stay signed in.
 export async function logout(
   accessToken?: string,
   refreshToken?: string,
-): Promise<string | undefined> {
-  const userId = identifyUser(accessToken, refreshToken);
-  if (!userId) return undefined; // nothing valid to revoke; cookies are cleared by the caller
+): Promise<{ userId: string; sessionId: string } | undefined> {
+  const identity = identifySession(accessToken, refreshToken);
+  if (!identity) return undefined; // nothing valid to revoke; cookies are cleared by the caller
 
-  await prisma.user.updateMany({
-    where: { id: userId },
-    data: { tokenVersion: { increment: 1 } },
-  });
-  return userId;
+  await endSession(identity.sessionId);
+  return identity;
 }
 
-function identifyUser(accessToken?: string, refreshToken?: string): string | undefined {
+function identifySession(
+  accessToken?: string,
+  refreshToken?: string,
+): { userId: string; sessionId: string } | undefined {
   if (accessToken) {
     try {
-      return verifyAccessToken(accessToken).sub;
+      const { sub, sid } = verifyAccessToken(accessToken);
+      if (sid) return { userId: sub, sessionId: sid };
     } catch {
       // expired or invalid — fall through to the refresh token
     }
   }
   if (refreshToken) {
     try {
-      return verifyRefreshToken(refreshToken).sub;
+      const { sub, sid } = verifyRefreshToken(refreshToken);
+      if (sid) return { userId: sub, sessionId: sid };
     } catch {
       // invalid refresh token — nothing to revoke
     }
@@ -288,7 +282,11 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
 // ─── Change password ──────────────────────────────────────────────────────────
 // Bumping tokenVersion signs the user out everywhere else; the caller gets fresh tokens so
 // the current session stays signed in.
-export async function changePassword(userId: string, input: ChangePasswordInput) {
+export async function changePassword(
+  userId: string,
+  input: ChangePasswordInput,
+  userAgent?: string,
+) {
   const current = await prisma.user.findUnique({
     where: { id: userId },
     select: { passwordHash: true },
@@ -304,14 +302,10 @@ export async function changePassword(userId: string, input: ChangePasswordInput)
     select: { ...SAFE_USER_SELECT, tokenVersion: true },
   });
 
+  // Every other device is signed out; this one gets a fresh session.
+  await endAllSessions(userId);
   const { tokenVersion, ...user } = updated;
-  const accessToken = signAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    tokenVersion,
-  });
-  const refreshToken = signRefreshToken(user.id, tokenVersion);
+  const { accessToken, refreshToken } = await startSession({ ...user, tokenVersion }, userAgent);
 
   return { user, accessToken, refreshToken };
 }
