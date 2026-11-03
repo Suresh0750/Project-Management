@@ -47,11 +47,7 @@ async function authenticateSocket(socket: Socket, next: (error?: Error) => void)
       return;
     }
 
-    // Bearer clients pass the token in the handshake; everyone else uses the HttpOnly cookie.
-    const handshakeToken = socket.handshake.auth?.token;
-    const token =
-      (typeof handshakeToken === 'string' && handshakeToken !== '' ? handshakeToken : undefined) ??
-      readCookie(socket.handshake.headers.cookie, ACCESS_TOKEN_COOKIE);
+    const token = readCookie(socket.handshake.headers.cookie, ACCESS_TOKEN_COOKIE);
     if (!token) {
       next(new Error('unauthorized'));
       return;

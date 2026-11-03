@@ -1,7 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { success } from '../../utils/apiResponse.js';
-import { extractBearerToken, tokensIfRequested } from '../../utils/bearer.js';
-import { PROBE_COOKIE, clearAuthCookies, setAuthCookies, setProbeCookie } from '../../utils/cookies.js';
+import { clearAuthCookies, setAuthCookies } from '../../utils/cookies.js';
 import { HttpError } from '../../utils/httpError.js';
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '../../constants.js';
 import * as authService from './auth.service.js';
@@ -32,14 +31,7 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
       req.body as VerifyEmailInput,
     );
     setAuthCookies(res, accessToken, refreshToken);
-    res
-      .status(200)
-      .json(
-        success(
-          { user, ...tokensIfRequested(req, { accessToken, refreshToken }) },
-          'Email verified successfully',
-        ),
-      );
+    res.status(200).json(success({ user }, 'Email verified successfully'));
   } catch (err) {
     next(err);
   }
@@ -60,11 +52,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       req.body as LoginInput,
     );
     setAuthCookies(res, accessToken, refreshToken);
-    res
-      .status(200)
-      .json(
-        success({ user, ...tokensIfRequested(req, { accessToken, refreshToken }) }, 'Login successful'),
-      );
+    res.status(200).json(success({ user }, 'Login successful'));
   } catch (err) {
     next(err);
   }
@@ -73,11 +61,9 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 // Public on purpose: a user whose access token has expired must still be able to log out.
 export async function logout(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Cookie clients are identified by their cookies, bearer clients by the Authorization header
-    // and the refresh token in the body. Either way every session of the user is revoked.
     const userId = await authService.logout(
-      extractBearerToken(req) ?? (req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined),
-      (req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined) ?? bodyRefreshToken(req),
+      req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined,
+      req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined,
     );
     clearAuthCookies(res);
     // Every session of this user was just revoked, so end their live connections as well. Other
@@ -91,19 +77,12 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
 
 export async function refreshTokens(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const token = (req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined) ?? bodyRefreshToken(req);
+    const token = req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined;
     if (!token) throw new HttpError(401, 'Refresh token not found');
 
     const { user, accessToken, refreshToken } = await authService.refresh(token);
     setAuthCookies(res, accessToken, refreshToken);
-    res
-      .status(200)
-      .json(
-        success(
-          { user, ...tokensIfRequested(req, { accessToken, refreshToken }) },
-          'Tokens refreshed successfully',
-        ),
-      );
+    res.status(200).json(success({ user }, 'Tokens refreshed successfully'));
   } catch (err) {
     // The refresh token is the last credential. If it is invalid, expired, revoked or its owner
     // was deactivated, nothing can renew this session, so remove the cookies as well.
@@ -142,32 +121,8 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     setAuthCookies(res, accessToken, refreshToken);
     // Other devices were just signed out; end their live connections too.
     disconnectUserSockets(user.id);
-    // The old tokens were just revoked with the other sessions, so a bearer client must be given
-    // the new pair or it would be signed out by its own password change.
-    res
-      .status(200)
-      .json(
-        success(
-          { user, ...tokensIfRequested(req, { accessToken, refreshToken }) },
-          'Password updated successfully',
-        ),
-      );
+    res.status(200).json(success({ user }, 'Password updated successfully'));
   } catch (err) {
     next(err);
   }
-}
-
-function bodyRefreshToken(req: Request): string | undefined {
-  const body = req.body as { refreshToken?: unknown } | undefined;
-  return typeof body?.refreshToken === 'string' ? body.refreshToken : undefined;
-}
-
-/**
- * Tells the client whether login cookies work in this browser. The first call sets a probe
- * cookie with the same flags as the login cookies; the second call reports whether it came back.
- */
-export function cookieProbe(req: Request, res: Response): void {
-  const cookiesWorking = (req.cookies as Record<string, string | undefined>)[PROBE_COOKIE] === '1';
-  setProbeCookie(res);
-  res.status(200).json(success({ cookiesWorking }, 'Cookie probe'));
 }

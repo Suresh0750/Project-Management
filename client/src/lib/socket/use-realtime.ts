@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useToast } from '@/components/ui/toast-provider';
 import { notificationsKeys } from '@/features/notifications/hooks';
-import { refreshSession } from '@/lib/api/client';
+import { apiClient } from '@/lib/api/client';
 import { getSocket } from '@/lib/socket/client';
 
 /** Events that mean "data you may be looking at changed on the server". */
@@ -42,7 +42,7 @@ export function useRealtime(): void {
       refreshing = true;
       authRetries += 1;
       try {
-        await refreshSession();
+        await apiClient.post('/auth/refresh');
         socket.connect();
       } catch {
         // Session is gone; the next REST call sends the user to /login.

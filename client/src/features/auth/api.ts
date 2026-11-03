@@ -1,24 +1,13 @@
 import { apiClient } from '@/lib/api/client';
 import type { ApiSuccess } from '@/lib/api/types';
 import type { AuthUser, AuthUserPayload } from '@/types/auth';
-import { clearTokens, getTokens, setTokens } from '@/lib/auth/token-store';
-import { currentTransportHeaders, getTransport, transportHeaders } from '@/lib/auth/transport';
 import type { LoginValues } from '@/schemas/auth';
 
-function applySession(payload: AuthUserPayload): AuthUser {
-  if (payload.tokens) setTokens(payload.tokens);
-  else clearTokens();
-  return payload.user;
-}
-
 export async function login(values: LoginValues, signal?: AbortSignal): Promise<AuthUser> {
-  // Cookie mode unless this browser turned out not to keep cookies (decided once per tab).
-  const transport = await getTransport();
   const { data } = await apiClient.post<ApiSuccess<AuthUserPayload>>('/auth/login', values, {
     signal,
-    headers: transportHeaders(transport),
   });
-  return applySession(data.data);
+  return data.data.user;
 }
 
 export async function getMe(signal?: AbortSignal): Promise<AuthUser> {
@@ -27,14 +16,7 @@ export async function getMe(signal?: AbortSignal): Promise<AuthUser> {
 }
 
 export async function logout(): Promise<void> {
-  const tokens = getTokens();
-  try {
-    // Bearer mode has no cookie for the server to read, so it also gets the refresh token.
-    await apiClient.post('/auth/logout', tokens ? { refreshToken: tokens.refreshToken } : undefined);
-  } finally {
-    // Always erase local credentials, even if the request failed: the user asked to leave.
-    clearTokens();
-  }
+  await apiClient.post('/auth/logout');
 }
 
 // NOTE: the server does not expose these two endpoints yet (reported after Phase 1).
@@ -61,11 +43,8 @@ export async function changePassword(payload: {
   currentPassword: string;
   newPassword: string;
 }): Promise<AuthUser> {
-  // The server revokes the old tokens with the other sessions; a bearer client is handed a new pair.
-  const { data } = await apiClient.patch<ApiSuccess<AuthUserPayload>>('/auth/password', payload, {
-    headers: currentTransportHeaders(),
-  });
-  return applySession(data.data);
+  const { data } = await apiClient.patch<ApiSuccess<AuthUserPayload>>('/auth/password', payload);
+  return data.data.user;
 }
 
 export interface OtpSent {
@@ -83,11 +62,8 @@ export async function registerAccount(values: {
 }
 
 export async function verifyEmail(values: { email: string; otp: string }): Promise<AuthUser> {
-  const transport = await getTransport();
-  const { data } = await apiClient.post<ApiSuccess<AuthUserPayload>>('/auth/verify-email', values, {
-    headers: transportHeaders(transport),
-  });
-  return applySession(data.data);
+  const { data } = await apiClient.post<ApiSuccess<AuthUserPayload>>('/auth/verify-email', values);
+  return data.data.user;
 }
 
 export async function resendOtp(email: string): Promise<{ resendAfterSeconds: number }> {

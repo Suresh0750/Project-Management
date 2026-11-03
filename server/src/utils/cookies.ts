@@ -54,14 +54,3 @@ export function clearAuthCookies(res: Response): void {
   res.clearCookie(ACCESS_TOKEN_COOKIE, { ...baseOptions, path: ACCESS_PATH });
   res.clearCookie(REFRESH_TOKEN_COOKIE, { ...baseOptions, path: REFRESH_PATH });
 }
-
-export const PROBE_COOKIE = 'cookie_probe';
-
-/**
- * Set with exactly the flags of the login cookies, so whether it comes back on the next request
- * tells the client whether login cookies would work here (they do not in private windows, with
- * blocked third-party cookies, or when the app and API are on different sites).
- */
-export function setProbeCookie(res: Response): void {
-  res.cookie(PROBE_COOKIE, '1', { ...baseOptions, maxAge: 5 * 60 * 1000, path: REFRESH_PATH });
-}
