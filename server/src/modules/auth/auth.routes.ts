@@ -6,7 +6,6 @@ import * as authController from './auth.controller.js';
 import {
   changePasswordSchema,
   loginSchema,
-  optionalRefreshTokenSchema,
   registerSchema,
   resendOtpSchema,
   updateProfileSchema,
@@ -41,13 +40,10 @@ router.post('/resend-otp', otpLimiter, validate(resendOtpSchema), authController
 router.post('/login', authLimiter, validate(loginSchema), authController.login);
 
 // POST /api/auth/logout  (revokes tokens + clears cookies; works with an expired access token)
-router.post('/logout', validate(optionalRefreshTokenSchema), authController.logout);
+router.post('/logout', authController.logout);
 
-// POST /api/auth/refresh  (refresh token from its cookie, or from the body for bearer clients)
-router.post('/refresh', validate(optionalRefreshTokenSchema), authController.refreshTokens);
-
-// GET /api/auth/cookie-probe  (do login cookies work in this browser? call twice, read the second)
-router.get('/cookie-probe', authController.cookieProbe);
+// POST /api/auth/refresh  (uses refresh token cookie)
+router.post('/refresh', authController.refreshTokens);
 
 // GET /api/auth/me  (authenticated)
 router.get('/me', authenticate, authController.me);
