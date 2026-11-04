@@ -1,6 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
 import { publicEnv } from '@/lib/env';
-import { getTokens } from '@/lib/auth/token-store';
 
 let socket: Socket | null = null;
 
@@ -13,8 +12,16 @@ export function getSocket(): Socket {
     socket = io(publicEnv.socketUrl, {
       autoConnect: false,
       withCredentials: true,
-      // Read on every (re)connect, so a refreshed token is used automatically.
-      auth: (send) => send({ token: getTokens()?.accessToken ?? null }),
+      // Asked for on every (re)connect, so a refreshed token is used automatically. The token
+      // comes from the app's own server (it reads the HttpOnly cookie) and is never stored.
+      auth: (send) => {
+        void fetch('/api/realtime-token', { cache: 'no-store' })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((body: { data?: { token?: string } } | null) =>
+            send({ token: body?.data?.token ?? null }),
+          )
+          .catch(() => send({ token: null }));
+      },
       transports: ['websocket', 'polling'],
     });
   }

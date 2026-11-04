@@ -16,12 +16,6 @@ import type {
   VerifyEmailInput,
 } from './auth.validation.js';
 
-// Tokens also travel in the response body (cookies are still set) so the client can send them
-// as Authorization: Bearer on every request.
-function tokensBody(accessToken: string, refreshToken: string) {
-  return { accessToken, refreshToken };
-}
-
 function bodyString(req: Request, key: string): string | undefined {
   const value = (req.body as Record<string, unknown> | undefined)?.[key];
   return typeof value === 'string' && value ? value : undefined;
@@ -45,7 +39,7 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
       req.get('user-agent'),
     );
     setAuthCookies(res, accessToken, refreshToken);
-    res.status(200).json(success({ user, tokens: tokensBody(accessToken, refreshToken) }, 'Email verified successfully'));
+    res.status(200).json(success({ user }, 'Email verified successfully'));
   } catch (err) {
     next(err);
   }
@@ -93,7 +87,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       req.get('user-agent'),
     );
     setAuthCookies(res, accessToken, refreshToken);
-    res.status(200).json(success({ user, tokens: tokensBody(accessToken, refreshToken) }, 'Login successful'));
+    res.status(200).json(success({ user }, 'Login successful'));
   } catch (err) {
     next(err);
   }
@@ -124,7 +118,7 @@ export async function refreshTokens(req: Request, res: Response, next: NextFunct
 
     const { user, accessToken, refreshToken } = await authService.refresh(token);
     setAuthCookies(res, accessToken, refreshToken);
-    res.status(200).json(success({ user, tokens: tokensBody(accessToken, refreshToken) }, 'Tokens refreshed successfully'));
+    res.status(200).json(success({ user }, 'Tokens refreshed successfully'));
   } catch (err) {
     // The refresh token is the last credential. If it is invalid, expired, revoked or its owner
     // was deactivated, nothing can renew this session, so remove the cookies as well.
@@ -164,7 +158,7 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     setAuthCookies(res, accessToken, refreshToken);
     // Other devices were just signed out; end their live connections too.
     disconnectUserSockets(user.id);
-    res.status(200).json(success({ user, tokens: tokensBody(accessToken, refreshToken) }, 'Password updated successfully'));
+    res.status(200).json(success({ user }, 'Password updated successfully'));
   } catch (err) {
     next(err);
   }
