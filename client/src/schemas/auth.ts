@@ -66,6 +66,11 @@ export const forgotPasswordSchema = z.object({ email });
 
 export const resetPasswordSchema = z
   .object({
+    email,
+    otp: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, 'Enter the 6-digit code'),
     password: passwordPolicy,
     confirmPassword: z.string().min(1, 'Confirm your password'),
   })

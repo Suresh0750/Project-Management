@@ -13,18 +13,18 @@ function fieldError(status: number, message: string): HttpError {
 }
 
 // Only a keyed hash is stored, so a database leak does not reveal live codes.
-function hashCode(userId: string, code: string): string {
+export function hashCode(userId: string, code: string): string {
   return createHmac('sha256', env.COOKIE_SECRET).update(`${userId}:${code}`).digest('hex');
 }
 
-function safeEqual(a: string, b: string): boolean {
+export function safeEqual(a: string, b: string): boolean {
   const left = Buffer.from(a);
   const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
 /** Cryptographically random 6-digit code (leading zeros kept). */
-function generateCode(): string {
+export function generateCode(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, '0');
 }
 

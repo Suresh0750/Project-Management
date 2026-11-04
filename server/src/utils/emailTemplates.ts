@@ -170,7 +170,7 @@ interface VerificationArgs {
   code: string;
   ttlMinutes: number;
   /** 'email-change': an administrator is changing the address on an existing account. */
-  purpose?: 'signup' | 'email-change';
+  purpose?: 'signup' | 'email-change' | 'password-reset';
 }
 
 /**
@@ -185,26 +185,58 @@ export function verificationEmail({
   purpose = 'signup',
 }: VerificationArgs): EmailContent {
   const changing = purpose === 'email-change';
+  const resetting = purpose === 'password-reset';
   const verifyUrl = `${env.CLIENT_URL.replace(/\/$/, '')}/verify-email?email=${encodeURIComponent(email)}`;
 
-  return build(`${code} is your ProjectFlow verification code`, {
-    preheader: `Your verification code is ${code}. It expires in ${ttlMinutes} minutes.`,
-    badge: { label: 'Email verification', tone: 'info' },
-    heading: 'Your verification code',
+  return build(resetting ? `${code} is your ProjectFlow password reset code` : `${code} is your ProjectFlow verification code`, {
+    preheader: `Your ${resetting ? 'password reset' : 'verification'} code is ${code}. It expires in ${ttlMinutes} minutes.`,
+    badge: { label: resetting ? 'Password reset' : 'Email verification', tone: 'info' },
+    heading: resetting ? 'Your password reset code' : 'Your verification code',
     code: { value: code, hint: 'Tap or double-click the code to select it, then copy.' },
     paragraphs: [
       `Hi ${name},`,
-      changing
+      resetting
+        ? `We received a request to reset the password of your ProjectFlow account. Enter this code to choose a new one. It expires in ${ttlMinutes} minutes and works only once.`
+        : changing
         ? `An administrator is changing the email address of your ProjectFlow account to this one. Give them this code to confirm it. It expires in ${ttlMinutes} minutes and works only once.`
         : `Enter this code to finish creating your ProjectFlow account. It expires in ${ttlMinutes} minutes and works only once.`,
     ],
-    ...(changing ? {} : { button: { label: 'Open the verification page', url: verifyUrl } }),
+    ...(changing || resetting ? {} : { button: { label: 'Open the verification page', url: verifyUrl } }),
     notes: [
-      'Never share this code with anyone except the administrator who is updating your account.',
-      changing
-        ? "If you weren't expecting this, you can safely ignore this email: nothing changes until the code is entered."
-        : "If you didn't create an account, you can safely ignore this email.",
+      resetting
+        ? 'Never share this code with anyone. ProjectFlow will never ask you for it.'
+        : 'Never share this code with anyone except the administrator who is updating your account.',
+      resetting
+        ? "If you didn't ask for this, you can safely ignore this email: your password stays the same."
+        : changing
+          ? "If you weren't expecting this, you can safely ignore this email: nothing changes until the code is entered."
+          : "If you didn't create an account, you can safely ignore this email.",
     ],
+    footer: footerFor(email),
+  });
+}
+
+interface RoleChangedArgs {
+  name: string;
+  email: string;
+  oldRole: string;
+  newRole: string;
+}
+
+/** Sent when an administrator changes someone's role. They are signed out and sign in again. */
+export function roleChangedEmail({ name, email, oldRole, newRole }: RoleChangedArgs): EmailContent {
+  const base = env.CLIENT_URL.replace(/\/$/, '');
+  return build('Your ProjectFlow role has changed', {
+    preheader: `Your role is now ${newRole}. Sign in again to continue.`,
+    badge: { label: 'Role changed', tone: 'info' },
+    heading: 'Your role has changed',
+    paragraphs: [
+      `Hi ${name},`,
+      `An administrator changed your ProjectFlow role from ${oldRole} to ${newRole}.`,
+      'For your security you have been signed out on every device. Sign in again to continue with your new role.',
+    ],
+    button: { label: 'Sign in', url: `${base}/login` },
+    notes: ["If you weren't expecting this, contact your administrator."],
     footer: footerFor(email),
   });
 }

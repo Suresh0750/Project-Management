@@ -11,7 +11,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { FilterDropdown } from '@/components/ui/filter-dropdown';
 import { Pagination } from '@/components/ui/pagination';
 import { SearchInput } from '@/components/ui/search-input';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { DeactivateUserDialog } from '@/components/users/deactivate-user-dialog';
 import { useToast } from '@/components/ui/toast-provider';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { EmailVerifiedBadge, RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
@@ -69,11 +69,18 @@ export function UsersListPage() {
     setPage(1);
   };
 
-  const applyStatus = (user: AuthUser, isActive: boolean) => {
+  const applyStatus = (user: AuthUser, isActive: boolean, holdProjects = false) => {
     updateStatus.mutate(
-      { id: user.id, isActive },
+      { id: user.id, isActive, holdProjects },
       {
-        onSuccess: () => toast.success(`${user.name} ${isActive ? 'activated' : 'deactivated'}`),
+        onSuccess: ({ heldProjects }) =>
+          toast.success(
+            `${user.name} ${isActive ? 'activated' : 'deactivated'}${
+              heldProjects > 0
+                ? `, ${heldProjects} ${heldProjects === 1 ? 'project' : 'projects'} put on hold`
+                : ''
+            }`,
+          ),
         onError: (error) => toast.error(error.message),
         onSettled: () => setPendingDeactivation(null),
       },
@@ -255,15 +262,13 @@ export function UsersListPage() {
         )}
       </div>
 
-      <ConfirmDialog
-        open={pendingDeactivation !== null}
-        title="Deactivate user?"
-        description={`${pendingDeactivation?.name ?? 'This user'} will be signed out and unable to log in until reactivated.`}
-        confirmLabel="Deactivate"
-        tone="danger"
+      <DeactivateUserDialog
+        user={pendingDeactivation}
         loading={updateStatus.isPending}
         onCancel={() => setPendingDeactivation(null)}
-        onConfirm={() => pendingDeactivation && applyStatus(pendingDeactivation, false)}
+        onConfirm={(holdProjects) =>
+          pendingDeactivation && applyStatus(pendingDeactivation, false, holdProjects)
+        }
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { HttpError } from '../../utils/httpError.js';
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '../../constants.js';
 import { extractBearerToken } from '../../middlewares/authenticate.js';
 import * as authService from './auth.service.js';
+import * as passwordResetService from './passwordReset.service.js';
 import { disconnectSessionSockets, disconnectUserSockets } from '../../realtime/socket.js';
 import type {
   ChangePasswordInput,
@@ -54,6 +55,32 @@ export async function resendOtp(req: Request, res: Response, next: NextFunction)
   try {
     const result = await authService.resendOtp((req.body as ResendOtpInput).email);
     res.status(200).json(success(result, 'If the account needs verification, a new code was sent.'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await passwordResetService.requestPasswordReset(
+      (req.body as { email: string }).email,
+    );
+    res
+      .status(200)
+      .json(success(result, 'If an account exists for that email, we sent a code to reset the password.'));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = await passwordResetService.resetPassword(
+      req.body as { email: string; otp: string; newPassword: string },
+    );
+    // Every session of this user just ended: close their live connections as well.
+    disconnectUserSockets(userId);
+    res.status(200).json(success(null, 'Password updated. Sign in with your new password.'));
   } catch (err) {
     next(err);
   }

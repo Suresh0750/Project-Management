@@ -1,57 +1,55 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { PasswordField } from '@/components/ui/password-field';
 import { PasswordRequirements } from '@/components/ui/password-requirements';
+import { TextField } from '@/components/ui/text-field';
 import { useToast } from '@/components/ui/toast-provider';
-import { useResetPassword } from '@/features/auth/hooks';
+import { useForgotPassword, useResetPassword } from '@/features/auth/hooks';
+import { useCountdown } from '@/hooks/use-countdown';
 import { resetPasswordSchema, type ResetPasswordValues } from '@/schemas/auth';
 import { asApiError } from '@/lib/api/errors';
 
 export function ResetPasswordForm() {
   const router = useRouter();
-  const token = useSearchParams().get('token');
+  const initialEmail = useSearchParams().get('email') ?? '';
   const toast = useToast();
   const resetPassword = useResetPassword();
+  const resend = useForgotPassword();
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     setError,
+    reset,
+    trigger,
+    getValues,
     control,
     formState: { errors },
   } = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { password: '', confirmPassword: '' },
+    mode: 'onTouched',
+    defaultValues: { email: initialEmail, otp: '', password: '', confirmPassword: '' },
   });
 
   const password = useWatch({ control, name: 'password' });
+  const typedEmail = useWatch({ control, name: 'email' });
+  // The saved deadline belongs to the address, so a refresh carries on from the real time left.
+  const { remaining, start } = useCountdown(`reset:${(typedEmail ?? '').trim().toLowerCase()}`);
 
-  if (!token) {
-    return (
-      <div className="space-y-4">
-        <Alert tone="error">This reset link is invalid or incomplete.</Alert>
-        <Link
-          href="/forgot-password"
-          className="block text-center text-sm font-medium text-primary hover:underline"
-        >
-          Request a new link
-        </Link>
-      </div>
-    );
-  }
+  // Never leave a typed code or password behind when the page goes away.
+  useEffect(() => () => reset({ email: '', otp: '', password: '', confirmPassword: '' }), [reset]);
 
-  const onSubmit = ({ password }: ResetPasswordValues) => {
+  const onSubmit = ({ email, otp, password }: ResetPasswordValues) => {
     setFormError(null);
     resetPassword.mutate(
-      { token, password },
+      { email: email.trim().toLowerCase(), otp, password },
       {
         onSuccess: () => {
           toast.success('Password updated. Sign in with your new password.');
@@ -59,23 +57,64 @@ export function ResetPasswordForm() {
         },
         onError: (raw) => {
           const error = asApiError(raw);
-          if (error.fieldErrors.password) {
-            setError('password', { message: error.fieldErrors.password });
+          const otpMessage = error.fieldErrors.otp;
+          if (otpMessage) {
+            setError('otp', { message: otpMessage });
             return;
           }
-          setFormError(
-            error.status === 404
-              ? 'Password reset is not available yet. Please contact an administrator.'
-              : error.message,
-          );
+          if (error.fieldErrors.newPassword) {
+            setError('password', { message: error.fieldErrors.newPassword });
+            return;
+          }
+          setFormError(error.message);
         },
       },
     );
   };
 
+  const resendCode = async () => {
+    if (!(await trigger('email'))) return;
+    setFormError(null);
+    const address = getValues('email').trim().toLowerCase();
+    resend.mutate(address, {
+      onSuccess: (sent) => {
+        toast.success('If an account exists for that address, a new code is on its way.');
+        start(sent?.resendAfterSeconds ?? 60);
+      },
+      onError: (error) => setFormError(error.message),
+    });
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      onChange={() => setFormError(null)}
+      noValidate
+      className="space-y-4"
+    >
       {formError && <Alert tone="error">{formError}</Alert>}
+
+      <TextField
+        label="Email"
+        type="email"
+        autoComplete="email"
+        error={errors.email?.message}
+        {...register('email')}
+      />
+
+      <TextField
+        label="Verification code"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        placeholder="••••••"
+        className="text-center text-xl font-semibold tracking-[0.5em]"
+        error={errors.otp?.message}
+        {...register('otp', {
+          // Digits only, so a pasted code with spaces or dashes still works.
+          setValueAs: (value: string) => value.replace(/\D/g, ''),
+        })}
+      />
 
       <PasswordField
         label="New password"
@@ -94,6 +133,16 @@ export function ResetPasswordForm() {
 
       <Button type="submit" fullWidth loading={resetPassword.isPending}>
         {resetPassword.isPending ? 'Updating…' : 'Update password'}
+      </Button>
+
+      <Button
+        variant="ghost"
+        fullWidth
+        onClick={() => void resendCode()}
+        loading={resend.isPending}
+        disabled={remaining > 0}
+      >
+        {remaining > 0 ? `Resend code in ${remaining}s` : 'Resend code'}
       </Button>
     </form>
   );

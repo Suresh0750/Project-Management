@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
-import { accountDeactivated } from '../../utils/accountErrors.js';
+import { ROLE_CHANGED_CODE, accountDeactivated, roleChanged } from '../../utils/accountErrors.js';
 import { HttpError } from '../../utils/httpError.js';
 import { verifyAccessToken, verifyRefreshToken } from '../../utils/jwt.js';
 import { env } from '../../config/env.js';
@@ -72,13 +72,13 @@ export async function verifyEmail(input: VerifyEmailInput, userAgent?: string) {
   const verified = await prisma.user.update({
     where: { id: user.id },
     data: { emailVerifiedAt: new Date() },
-    select: { ...SAFE_USER_SELECT, tokenVersion: true },
+    select: SAFE_USER_SELECT,
   });
 
   // Proving the mailbox is the sign-in, so the user lands in the app without logging in again.
-  const { tokenVersion, ...safeUser } = verified;
+  const safeUser = verified;
   const { accessToken, refreshToken } = await startSession(
-    { id: safeUser.id, email: safeUser.email, role: safeUser.role, tokenVersion },
+    { id: safeUser.id, email: safeUser.email, role: safeUser.role },
     userAgent,
   );
 
@@ -161,22 +161,23 @@ export async function refresh(refreshToken: string) {
         select: {
           userId: true,
           expiresAt: true,
-          user: { select: { ...SAFE_USER_SELECT, tokenVersion: true } },
+          endedReason: true,
+          user: { select: SAFE_USER_SELECT },
         },
       })
     : null;
   if (!session || session.userId !== payload.sub || session.expiresAt <= new Date()) {
     throw new HttpError(401, 'Session has been revoked');
   }
+  if (session.endedReason === ROLE_CHANGED_CODE) throw roleChanged();
   const record = session.user;
 
   if (!record) throw new HttpError(401, 'User not found');
   if (!record.isActive) throw accountDeactivated();
   if (!record.emailVerifiedAt) throw new HttpError(403, 'Email address is not verified');
-  if (payload.tv !== record.tokenVersion) throw new HttpError(401, 'Session has been revoked');
 
-  const { tokenVersion, ...user } = record;
-  const tokens = await renewSession({ ...user, tokenVersion }, payload.sid);
+  const user = record;
+  const tokens = await renewSession(user, payload.sid);
 
   return { user, ...tokens };
 }
@@ -280,7 +281,7 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
 }
 
 // ─── Change password ──────────────────────────────────────────────────────────
-// Bumping tokenVersion signs the user out everywhere else; the caller gets fresh tokens so
+// Deleting every session signs the user out everywhere else; the caller gets a fresh session so
 // the current session stays signed in.
 export async function changePassword(
   userId: string,
@@ -298,14 +299,14 @@ export async function changePassword(
   const passwordHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
   const updated = await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash, tokenVersion: { increment: 1 } },
-    select: { ...SAFE_USER_SELECT, tokenVersion: true },
+    data: { passwordHash },
+    select: SAFE_USER_SELECT,
   });
 
   // Every other device is signed out; this one gets a fresh session.
   await endAllSessions(userId);
-  const { tokenVersion, ...user } = updated;
-  const { accessToken, refreshToken } = await startSession({ ...user, tokenVersion }, userAgent);
+  const user = updated;
+  const { accessToken, refreshToken } = await startSession(user, userAgent);
 
   return { user, accessToken, refreshToken };
 }

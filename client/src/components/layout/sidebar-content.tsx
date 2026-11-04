@@ -33,7 +33,7 @@ export function SidebarContent({
     <div className="flex h-full flex-col">
       <div
         className={cn(
-          'flex h-16 shrink-0 items-center gap-2 border-b border-border px-4',
+          'flex h-14 shrink-0 items-center gap-2 border-b border-border px-4',
           collapsed && 'justify-center px-0',
         )}
       >

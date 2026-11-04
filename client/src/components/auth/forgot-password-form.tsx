@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,11 +8,12 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { useForgotPassword } from '@/features/auth/hooks';
+import { startCountdown } from '@/hooks/use-countdown';
 import { forgotPasswordSchema, type ForgotPasswordValues } from '@/schemas/auth';
 
 export function ForgotPasswordForm() {
+  const router = useRouter();
   const forgotPassword = useForgotPassword();
-  const [sentTo, setSentTo] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -26,34 +27,16 @@ export function ForgotPasswordForm() {
 
   const onSubmit = ({ email }: ForgotPasswordValues) => {
     setFormError(null);
-    forgotPassword.mutate(email, {
-      onSuccess: () => setSentTo(email),
-      onError: (error) => {
-        setFormError(
-          error.status === 404
-            ? 'Password reset is not available yet. Please contact an administrator.'
-            : error.message,
-        );
+    const address = email.trim().toLowerCase();
+    forgotPassword.mutate(address, {
+      onSuccess: (sent) => {
+        // The resend timer is saved for this address, so it carries on if the page is refreshed.
+        startCountdown(`reset:${address}`, sent?.resendAfterSeconds ?? 60);
+        router.push(`/reset-password?email=${encodeURIComponent(address)}`);
       },
+      onError: (error) => setFormError(error.message),
     });
   };
-
-  if (sentTo) {
-    return (
-      <div className="space-y-4">
-        <Alert tone="success">
-          If an account exists for <strong>{sentTo}</strong>, we have sent instructions to reset the
-          password.
-        </Alert>
-        <Link
-          href="/login"
-          className="block text-center text-sm font-medium text-primary hover:underline"
-        >
-          Back to sign in
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
@@ -64,12 +47,13 @@ export function ForgotPasswordForm() {
         type="email"
         autoComplete="email"
         placeholder="you@company.com"
+        hint="We will email a 6-digit code if an account exists for this address."
         error={errors.email?.message}
         {...register('email')}
       />
 
       <Button type="submit" fullWidth loading={forgotPassword.isPending}>
-        {forgotPassword.isPending ? 'Sending…' : 'Send reset link'}
+        {forgotPassword.isPending ? 'Sending…' : 'Send code'}
       </Button>
     </form>
   );

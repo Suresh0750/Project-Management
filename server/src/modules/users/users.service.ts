@@ -1,12 +1,15 @@
 import bcrypt from 'bcryptjs';
-import { Role, type Prisma } from '@prisma/client';
+import { ProjectStatus, Role, type Prisma } from '@prisma/client';
+import { Outbox } from '../../realtime/outbox.js';
+import { recordActivity } from '../activity/activity.service.js';
 import { prisma } from '../../../prisma/client.js';
 import { env } from '../../config/env.js';
 import { disconnectUserSockets } from '../../realtime/socket.js';
 import { consumeOtp, issueOtp } from '../auth/otp.service.js';
-import { endAllSessions } from '../auth/session.service.js';
+import { endAllSessions, markSessionsEnded } from '../auth/session.service.js';
+import { ROLE_CHANGED_CODE } from '../../utils/accountErrors.js';
 import { HttpError } from '../../utils/httpError.js';
-import { accountStatusEmail } from '../../utils/emailTemplates.js';
+import { accountStatusEmail, roleChangedEmail } from '../../utils/emailTemplates.js';
 import { sendMail } from '../../utils/mailer.js';
 import { SAFE_USER_SELECT, DEFAULT_PAGE, DEFAULT_LIMIT } from '../../constants.js';
 import type {
@@ -16,6 +19,12 @@ import type {
 } from './users.validation.js';
 
 const SALT_ROUNDS = 12;
+
+const ROLE_LABEL: Record<Role, string> = {
+  ADMIN: 'Administrator',
+  PROJECT_MANAGER: 'Project Manager',
+  MEMBER: 'Member',
+};
 
 // ─── List users (Admin only) ──────────────────────────────────────────────────
 export async function listUsers(query: ListUsersQuery) {
@@ -68,10 +77,76 @@ export async function getUserById(id: string) {
   const pending = await findPendingEmailChange(id);
   return {
     ...user,
+    roleLockedReason: await roleChangeBlocker(user),
+    projects: await projectsOf(user),
     pendingEmail: pending?.newEmail ?? null,
     // Seconds until another code may be requested, so a refresh does not restart the timer.
     emailChangeResendAfter: pending?.resendAfterSeconds ?? 0,
   };
+}
+
+/**
+ * Why this person's role cannot be changed right now, or null when it can. Changing the role of
+ * someone who is still working in the old role would leave projects without a manager, or tasks
+ * and memberships a Project Manager is not allowed to hold:
+ *   Project Manager -> Member : only when they manage no project (archived ones count)
+ *   Member -> Project Manager : only when they are on no project and hold no task
+ */
+async function roleChangeBlocker(user: {
+  id: string;
+  name: string;
+  role: Role;
+}): Promise<string | null> {
+  if (user.role === Role.PROJECT_MANAGER) {
+    const managed = await prisma.project.count({ where: { managerId: user.id } });
+    if (managed === 0) return null;
+    return `${user.name} is the Project Manager of ${managed} ${managed === 1 ? 'project' : 'projects'}. Assign ${managed === 1 ? 'it' : 'them'} to another Project Manager before changing this role.`;
+  }
+
+  if (user.role === Role.MEMBER) {
+    const [projects, tasks] = await Promise.all([
+      prisma.projectMember.count({ where: { userId: user.id } }),
+      prisma.task.count({ where: { assigneeId: user.id, deletedAt: null } }),
+    ]);
+    if (projects === 0 && tasks === 0) return null;
+    const parts = [
+      projects > 0 ? `is a member of ${projects} ${projects === 1 ? 'project' : 'projects'}` : null,
+      tasks > 0 ? `has ${tasks} assigned ${tasks === 1 ? 'task' : 'tasks'}` : null,
+    ].filter(Boolean);
+    return `${user.name} ${parts.join(' and ')}. Remove them from every project and unassign their tasks before making them a Project Manager.`;
+  }
+
+  return null;
+}
+
+const PROJECT_REF_SELECT = {
+  id: true,
+  name: true,
+  status: true,
+  priority: true,
+  archivedAt: true,
+} as const;
+
+/** Projects a Project Manager manages, or a Member belongs to (what the admin sees on the user page). */
+async function projectsOf(user: { id: string; role: Role }) {
+  if (user.role === Role.PROJECT_MANAGER) {
+    return prisma.project.findMany({
+      where: { managerId: user.id },
+      select: PROJECT_REF_SELECT,
+      orderBy: [{ archivedAt: { sort: 'asc', nulls: 'first' } }, { name: 'asc' }],
+      take: 100,
+    });
+  }
+  if (user.role === Role.MEMBER) {
+    const memberships = await prisma.projectMember.findMany({
+      where: { userId: user.id },
+      select: { project: { select: PROJECT_REF_SELECT } },
+      orderBy: { joinedAt: 'desc' },
+      take: 100,
+    });
+    return memberships.map((membership) => membership.project);
+  }
+  return [];
 }
 
 /** The new address an administrator started changing to, while its code is still valid. */
@@ -132,11 +207,16 @@ export async function updateUser(id: string, input: UpdateUserInput, requesterId
   });
   if (!target) throw new HttpError(404, 'User not found');
 
-  if (input.role !== undefined && input.role !== target.role) {
+  const roleChanged = input.role !== undefined && input.role !== target.role;
+  if (roleChanged) {
     if (id === requesterId) throw new HttpError(400, 'You cannot change your own role');
     if (target.role === Role.ADMIN) {
       throw new HttpError(403, 'Administrator roles cannot be changed');
     }
+    // Checked here, on the server, so the rule holds even if the form is bypassed. It runs before
+    // anything else (including the email code) so a refused change leaves everything untouched.
+    const blocker = await roleChangeBlocker(target);
+    if (blocker) throw new HttpError(409, blocker, [{ path: 'role', message: blocker }]);
   }
 
   const emailChanged = input.email !== undefined && input.email !== target.email;
@@ -176,7 +256,28 @@ export async function updateUser(id: string, input: UpdateUserInput, requesterId
         ? await prisma.user.update({ where: { id }, data, select: SAFE_USER_SELECT })
         : await prisma.user.findUniqueOrThrow({ where: { id }, select: SAFE_USER_SELECT });
     const pendingEmail = emailChange?.newEmail ?? (await findPendingEmail(id));
-    return { user: { ...user, pendingEmail }, emailChange };
+    if (roleChanged) {
+      // Sign the person out everywhere: their open pages and live connections were set up for the
+      // old role. The sessions are tagged, so their next request explains why they were signed out.
+      await markSessionsEnded(id, ROLE_CHANGED_CODE);
+      disconnectUserSockets(id);
+
+      // Best effort and off the request path, like the deactivation email.
+      void sendMail({
+        to: user.email,
+        ...roleChangedEmail({
+          name: user.name,
+          email: user.email,
+          oldRole: ROLE_LABEL[target.role],
+          newRole: ROLE_LABEL[user.role],
+        }),
+      }).catch((error: unknown) => {
+        console.error('Could not send the role changed email', error);
+      });
+    }
+    const roleLockedReason = await roleChangeBlocker(user);
+    const projects = await projectsOf(user);
+    return { user: { ...user, pendingEmail, roleLockedReason, projects }, emailChange };
   } catch (err) {
     if (isUniqueViolation(err)) throw new HttpError(409, 'Email address is already in use');
     throw err;
@@ -239,8 +340,16 @@ export async function cancelEmailChange(id: string): Promise<void> {
 }
 
 // ─── Update user status (activate / deactivate) ───────────────────────────────
-export async function updateUserStatus(id: string, isActive: boolean, requesterId: string) {
-  const before = await prisma.user.findUnique({ where: { id }, select: { isActive: true } });
+export async function updateUserStatus(
+  id: string,
+  isActive: boolean,
+  requesterId: string,
+  options: { holdProjects?: boolean; requesterName?: string } = {},
+) {
+  const before = await prisma.user.findUnique({
+    where: { id },
+    select: { isActive: true, role: true },
+  });
   if (!before) throw new HttpError(404, 'User not found');
 
   // Prevent self-deactivation
@@ -248,12 +357,48 @@ export async function updateUserStatus(id: string, isActive: boolean, requesterI
     throw new HttpError(400, 'You cannot deactivate your own account');
   }
 
-  const user = await prisma.user.update({
-    where: { id },
-    // Deactivating also revokes every outstanding access/refresh token.
-    data: isActive ? { isActive } : { isActive, tokenVersion: { increment: 1 } },
-    select: SAFE_USER_SELECT,
+  // Optionally put the projects this Project Manager runs on hold, in the same transaction as the
+  // deactivation. Finished (completed) and archived projects, and ones already on hold, are left alone.
+  const holdProjects =
+    options.holdProjects === true &&
+    !isActive &&
+    before.isActive &&
+    before.role === Role.PROJECT_MANAGER;
+  const outbox = new Outbox();
+  let heldProjects = 0;
+
+  const user = await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id },
+      data: { isActive },
+      select: SAFE_USER_SELECT,
+    });
+
+    if (holdProjects) {
+      const projects = await tx.project.findMany({
+        where: {
+          managerId: id,
+          archivedAt: null,
+          status: { in: [ProjectStatus.PLANNING, ProjectStatus.ACTIVE] },
+        },
+        select: { id: true, name: true },
+      });
+      for (const project of projects) {
+        await tx.project.update({ where: { id: project.id }, data: { status: ProjectStatus.ON_HOLD } });
+        await recordActivity(tx, {
+          action: 'PROJECT_UPDATED',
+          message: `${options.requesterName ?? 'An administrator'} put "${project.name}" on hold because its Project Manager ${updated.name} was deactivated`,
+          actorId: requesterId,
+          projectId: project.id,
+          metadata: { fields: ['status'], status: ProjectStatus.ON_HOLD },
+        });
+        outbox.addProjectEvent(project.id, 'project:updated');
+      }
+      heldProjects = projects.length;
+    }
+    return updated;
   });
+  outbox.flush();
 
   if (before.isActive !== isActive) {
     // Open tabs and devices learn about it immediately instead of on their next click.
@@ -277,7 +422,7 @@ export async function updateUserStatus(id: string, isActive: boolean, requesterI
     });
   }
 
-  return user;
+  return { user, heldProjects };
 }
 
 // ─── Internal helper ──────────────────────────────────────────────────────────

@@ -5,13 +5,14 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { DeactivateUserDialog } from '@/components/users/deactivate-user-dialog';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast-provider';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { EmailVerifiedBadge, RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
 import { EmailChangePanel } from '@/components/users/email-change-panel';
+import { UserProjectsCard } from '@/components/users/user-projects-card';
 import { startCountdown } from '@/hooks/use-countdown';
 import { UserForm } from '@/components/users/user-form';
 import { useSession } from '@/features/auth/hooks';
@@ -67,7 +68,7 @@ export function UserDetailPage() {
     ? 'You cannot change your own role.'
     : isAdminAccount
       ? 'Administrator roles cannot be changed.'
-      : undefined;
+      : (target.roleLockedReason ?? undefined);
 
   const handleSave = async (values: UserFormValues) => {
     const payload: UpdateUserPayload = {};
@@ -87,11 +88,18 @@ export function UserDetailPage() {
     }
   };
 
-  const setActive = (isActive: boolean) => {
+  const setActive = (isActive: boolean, holdProjects = false) => {
     updateStatus.mutate(
-      { id: target.id, isActive },
+      { id: target.id, isActive, holdProjects },
       {
-        onSuccess: () => toast.success(`User ${isActive ? 'activated' : 'deactivated'}`),
+        onSuccess: ({ heldProjects }) =>
+          toast.success(
+            `User ${isActive ? 'activated' : 'deactivated'}${
+              heldProjects > 0
+                ? `, ${heldProjects} ${heldProjects === 1 ? 'project' : 'projects'} put on hold`
+                : ''
+            }`,
+          ),
         onError: (error) => toast.error(error.message),
         onSettled: () => setConfirmDeactivate(false),
       },
@@ -177,17 +185,28 @@ export function UserDetailPage() {
             onSubmit={handleSave}
           />
         </section>
+
+        {!isAdminAccount && (
+          <div className="lg:col-start-2">
+            <UserProjectsCard
+              title={target.role === 'PROJECT_MANAGER' ? 'Projects managed' : 'Projects'}
+              projects={target.projects ?? []}
+              projectsPath="/admin/projects"
+              emptyMessage={
+                target.role === 'PROJECT_MANAGER'
+                  ? 'This Project Manager does not manage any project yet.'
+                  : 'This member has not been added to any project yet.'
+              }
+            />
+          </div>
+        )}
       </div>
 
-      <ConfirmDialog
-        open={confirmDeactivate}
-        title="Deactivate user?"
-        description={`${target.name} will be signed out and unable to log in until reactivated.`}
-        confirmLabel="Deactivate"
-        tone="danger"
+      <DeactivateUserDialog
+        user={confirmDeactivate ? { id: target.id, name: target.name, role: target.role } : null}
         loading={updateStatus.isPending}
         onCancel={() => setConfirmDeactivate(false)}
-        onConfirm={() => setActive(false)}
+        onConfirm={(holdProjects) => setActive(false, holdProjects)}
       />
     </div>
   );

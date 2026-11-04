@@ -26,13 +26,25 @@ export async function logout(): Promise<void> {
   }
 }
 
-// NOTE: the server does not expose these two endpoints yet (reported after Phase 1).
-export async function forgotPassword(email: string): Promise<void> {
-  await apiClient.post('/auth/forgot-password', { email });
+/** Emails a one-time code (if the account exists; the answer is always the same). */
+export async function forgotPassword(email: string): Promise<{ resendAfterSeconds: number }> {
+  const { data } = await apiClient.post<ApiSuccess<{ resendAfterSeconds: number }>>(
+    '/auth/forgot-password',
+    { email },
+  );
+  return data.data;
 }
 
-export async function resetPassword(token: string, password: string): Promise<void> {
-  await apiClient.post('/auth/reset-password', { token, password });
+export async function resetPassword(values: {
+  email: string;
+  otp: string;
+  password: string;
+}): Promise<void> {
+  await apiClient.post('/auth/reset-password', {
+    email: values.email,
+    otp: values.otp,
+    newPassword: values.password,
+  });
 }
 
 export interface UpdateProfilePayload {

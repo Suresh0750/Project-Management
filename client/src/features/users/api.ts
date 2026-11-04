@@ -94,10 +94,20 @@ export async function cancelEmailChange(id: string): Promise<void> {
   await apiClient.delete(`/users/${encodeURIComponent(id)}/email/pending`);
 }
 
-export async function updateUserStatus(id: string, isActive: boolean): Promise<AuthUser> {
-  const { data } = await apiClient.patch<ApiSuccess<UserPayload>>(
+export interface UpdateUserStatusResult {
+  user: AuthUser;
+  /** Projects that were put on hold together with the deactivation. */
+  heldProjects: number;
+}
+
+export async function updateUserStatus(
+  id: string,
+  isActive: boolean,
+  holdProjects?: boolean,
+): Promise<UpdateUserStatusResult> {
+  const { data } = await apiClient.patch<ApiSuccess<UpdateUserStatusResult>>(
     `/users/${encodeURIComponent(id)}/status`,
-    { isActive },
+    { isActive, ...(holdProjects ? { holdProjects } : {}) },
   );
-  return data.data.user;
+  return data.data;
 }

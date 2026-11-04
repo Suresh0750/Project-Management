@@ -10,6 +10,18 @@ export const registerSchema = z.object({
   }),
 });
 
+export const forgotPasswordSchema = z.object({
+  body: z.object({ email: z.string().trim().toLowerCase().email('Invalid email address') }),
+});
+
+export const resetPasswordSchema = z.object({
+  body: z.object({
+    email: z.string().trim().toLowerCase().email('Invalid email address'),
+    otp: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+    newPassword: passwordSchema,
+  }),
+});
+
 export const loginSchema = z.object({
   body: z.object({
     email: z.string().trim().toLowerCase().email('Invalid email address'),
