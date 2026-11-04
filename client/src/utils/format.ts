@@ -20,6 +20,14 @@ export function formatCalendarDate(value: string): string {
   return utcDateFormatter.format(new Date(value));
 }
 
+/** Today in the browser's time zone as an <input type="date"> value (YYYY-MM-DD). */
+export function todayInputValue(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 /** ISO timestamp → value for <input type="date"> (YYYY-MM-DD). */
 export function toDateInputValue(value: string | null): string {
   return value ? value.slice(0, 10) : '';
@@ -41,4 +49,19 @@ export function formatRelativeTime(value: string): string {
     if (Math.abs(seconds) >= size) return relativeFormatter.format(Math.round(seconds / size), unit);
   }
   return 'just now';
+}
+
+const STATUS_WORDS: Record<string, string> = {
+  TODO: 'To Do',
+  IN_PROGRESS: 'In Progress',
+  IN_REVIEW: 'In Review',
+  COMPLETED: 'Completed',
+};
+
+/**
+ * Notification and activity messages are stored as text. Older rows contain raw status codes
+ * ("moved to IN_PROGRESS"); show them the way the rest of the app labels them.
+ */
+export function readableMessage(message: string): string {
+  return message.replace(/\b(TODO|IN_PROGRESS|IN_REVIEW|COMPLETED)\b/g, (code) => STATUS_WORDS[code] ?? code);
 }

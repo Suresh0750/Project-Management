@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PRIORITIES } from '@/types/project';
 import { TASK_STATUSES } from '@/types/task';
+import { todayInputValue } from '@/utils/format';
 import { lineString, textString } from '@/lib/text';
 
 const fields = z.object({
@@ -21,8 +22,12 @@ const fields = z.object({
 export type TaskFormValues = z.infer<typeof fields>;
 
 /** Create needs a project; edit never changes it. Both share one shape so one form serves both. */
-export function taskFormSchema(mode: 'create' | 'edit') {
+export function taskFormSchema(mode: 'create' | 'edit', originalDueDate = '') {
   return fields.superRefine((values, ctx) => {
+    // A due date cannot be in the past. While editing, keeping the saved date is still fine.
+    if (values.dueDate && values.dueDate < todayInputValue() && values.dueDate !== originalDueDate) {
+      ctx.addIssue({ code: 'custom', path: ['dueDate'], message: 'Due date cannot be in the past' });
+    }
     if (mode === 'create' && !values.projectId) {
       ctx.addIssue({ code: 'custom', path: ['projectId'], message: 'Select a project' });
     }

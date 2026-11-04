@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ClipboardPaste, MailCheck } from 'lucide-react';
 import { Alert } from '@/components/ui/alert';
@@ -16,8 +16,6 @@ import { verifyEmailSchema, type VerifyEmailValues } from '@/schemas/auth';
 import { ROLE_HOME } from '@/utils/role-routes';
 import { asApiError } from '@/lib/api/errors';
 
-const RESEND_SECONDS = 60;
-
 export function VerifyEmailForm() {
   const router = useRouter();
   const toast = useToast();
@@ -28,7 +26,6 @@ export function VerifyEmailForm() {
 
   const verify = useVerifyEmail();
   const resend = useResendOtp();
-  const { remaining, start } = useCountdown(justSent ? RESEND_SECONDS : 0);
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -39,12 +36,18 @@ export function VerifyEmailForm() {
     getValues,
     setValue,
     trigger,
+    control,
     formState: { errors },
   } = useForm<VerifyEmailValues>({
     resolver: zodResolver(verifyEmailSchema),
     mode: 'onTouched',
     defaultValues: { email: initialEmail, otp: '' },
   });
+
+  // The saved deadline belongs to the email, so a refresh (or another tab) carries on from the
+  // real time left, and a different address has its own timer.
+  const typedEmail = useWatch({ control, name: 'email' });
+  const { remaining, start } = useCountdown(`verify:${(typedEmail ?? '').trim().toLowerCase()}`);
 
   useEffect(() => () => reset({ email: '', otp: '' }), [reset]);
 

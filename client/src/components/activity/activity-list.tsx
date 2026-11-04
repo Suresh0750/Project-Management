@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ActivityItem } from '@/types/activity';
-import { formatDateTime } from '@/utils/format';
+import { formatDateTime, readableMessage } from '@/utils/format';
 
 const ACTION_ICON: Record<string, LucideIcon> = {
   PROJECT_CREATED: FolderPlus,
@@ -49,7 +49,7 @@ export function ActivityList({ items, basePath }: ActivityListProps) {
               <Icon className="size-4" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="break-words text-sm">{item.message}</p>
+              <p className="break-words text-sm">{readableMessage(item.message)}</p>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                 <time dateTime={item.createdAt}>{formatDateTime(item.createdAt)}</time>
                 {item.project && (

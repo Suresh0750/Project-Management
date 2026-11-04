@@ -46,6 +46,11 @@ export const updateUserSchema = z.object({
     .refine((body) => Object.keys(body).length > 0, { message: 'At least one field is required' }),
 });
 
+export const confirmEmailChangeSchema = z.object({
+  params: idParamSchema,
+  body: z.object({ otp: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code') }),
+});
+
 export const updateUserStatusSchema = z.object({
   params: idParamSchema,
   body: z.object({

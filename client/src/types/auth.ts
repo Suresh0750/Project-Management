@@ -10,6 +10,10 @@ export interface AuthUser {
   isActive: boolean;
   /** null until the email is verified (self-registered) — admin-created accounts are verified. */
   emailVerifiedAt: string | null;
+  /** Admin user detail only: a new address waiting for its verification code. */
+  pendingEmail?: string | null;
+  /** With pendingEmail: seconds until another code may be requested. */
+  emailChangeResendAfter?: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { PasswordField } from '@/components/ui/password-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
+import { startCountdownIfIdle } from '@/hooks/use-countdown';
 import { useLogin, useSession } from '@/features/auth/hooks';
 import { loginSchema, type LoginValues } from '@/schemas/auth';
 import { resolvePostLoginPath } from '@/utils/role-routes';
@@ -80,6 +81,7 @@ export function LoginForm() {
         const error = asApiError(raw);
         // Right password but the email was never verified: the server just sent a fresh code.
         if (error.fieldErrors.code === 'EMAIL_NOT_VERIFIED') {
+          startCountdownIfIdle(`verify:${credentials.email}`, 60);
           router.push(`/verify-email?email=${encodeURIComponent(credentials.email)}&sent=1`);
           return;
         }

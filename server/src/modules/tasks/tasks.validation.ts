@@ -20,6 +20,15 @@ const dueDateSchema = z
   .transform((value) => new Date(value))
   .nullable();
 
+// A due date cannot be in the past. One day of slack covers people whose local "today" is still
+// yesterday in UTC (dates are stored as UTC midnight).
+export const DUE_DATE_PAST_MESSAGE = 'Due date cannot be in the past';
+export function isPastDueDate(date: Date): boolean {
+  const now = new Date();
+  const earliest = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1);
+  return date.getTime() < earliest;
+}
+
 const prioritySchema = z.nativeEnum(Priority, { message: 'Invalid priority' });
 const statusSchema = z.nativeEnum(TaskStatus, { message: 'Invalid status' });
 
@@ -50,7 +59,9 @@ export const createTaskSchema = z.object({
     assigneeId: idSchema.nullable().optional(),
     priority: prioritySchema.default('MEDIUM'),
     status: statusSchema.default('TODO'),
-    dueDate: dueDateSchema.optional(),
+    dueDate: dueDateSchema
+      .refine((date) => date === null || !isPastDueDate(date), DUE_DATE_PAST_MESSAGE)
+      .optional(),
   }),
 });
 

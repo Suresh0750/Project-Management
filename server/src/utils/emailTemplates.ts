@@ -169,13 +169,22 @@ interface VerificationArgs {
   email: string;
   code: string;
   ttlMinutes: number;
+  /** 'email-change': an administrator is changing the address on an existing account. */
+  purpose?: 'signup' | 'email-change';
 }
 
 /**
  * The code leads everywhere it can: in the subject (shows in notifications), the inbox preview
  * and, first, in the body, large and select-on-click so it is one tap to copy.
  */
-export function verificationEmail({ name, email, code, ttlMinutes }: VerificationArgs): EmailContent {
+export function verificationEmail({
+  name,
+  email,
+  code,
+  ttlMinutes,
+  purpose = 'signup',
+}: VerificationArgs): EmailContent {
+  const changing = purpose === 'email-change';
   const verifyUrl = `${env.CLIENT_URL.replace(/\/$/, '')}/verify-email?email=${encodeURIComponent(email)}`;
 
   return build(`${code} is your ProjectFlow verification code`, {
@@ -185,12 +194,16 @@ export function verificationEmail({ name, email, code, ttlMinutes }: Verificatio
     code: { value: code, hint: 'Tap or double-click the code to select it, then copy.' },
     paragraphs: [
       `Hi ${name},`,
-      `Enter this code to finish creating your ProjectFlow account. It expires in ${ttlMinutes} minutes and works only once.`,
+      changing
+        ? `An administrator is changing the email address of your ProjectFlow account to this one. Give them this code to confirm it. It expires in ${ttlMinutes} minutes and works only once.`
+        : `Enter this code to finish creating your ProjectFlow account. It expires in ${ttlMinutes} minutes and works only once.`,
     ],
-    button: { label: 'Open the verification page', url: verifyUrl },
+    ...(changing ? {} : { button: { label: 'Open the verification page', url: verifyUrl } }),
     notes: [
-      'Never share this code with anyone. ProjectFlow will never ask you for it.',
-      "If you didn't create an account, you can safely ignore this email.",
+      'Never share this code with anyone except the administrator who is updating your account.',
+      changing
+        ? "If you weren't expecting this, you can safely ignore this email: nothing changes until the code is entered."
+        : "If you didn't create an account, you can safely ignore this email.",
     ],
     footer: footerFor(email),
   });

@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { PasswordField } from '@/components/ui/password-field';
 import { PasswordRequirements } from '@/components/ui/password-requirements';
+import { startCountdown } from '@/hooks/use-countdown';
 import { generateMemorablePassword } from '@/utils/password';
 import { TextField } from '@/components/ui/text-field';
 import { useRegister } from '@/features/auth/hooks';
@@ -55,8 +56,10 @@ export function RegisterForm() {
 
   const password = useWatch({ control, name: 'password' });
 
-  const goToVerification = (email: string) =>
+  const goToVerification = (email: string, cooldownSeconds: number) => {
+    startCountdown(`verify:${email}`, cooldownSeconds);
     router.push(`/verify-email?email=${encodeURIComponent(email)}&sent=1`);
+  };
 
   const submit = handleSubmit(({ name, email, password }) => {
     setFormError(null);
@@ -65,12 +68,15 @@ export function RegisterForm() {
       {
         // Use the address that was typed (the server stores it trimmed and lower-cased), so
         // navigation never depends on the shape of the response.
-        onSuccess: () => goToVerification(email?.trim()?.toLowerCase()),
+        onSuccess: (sent) =>
+          goToVerification(email?.trim()?.toLowerCase(), sent?.resendAfterSeconds ?? 60),
         onError: (raw) => {
           const error = asApiError(raw);
           // A code for this address was just sent: carry on to the verification screen.
           if (error.status === 429 && error.fieldErrors.otp) {
-            goToVerification(email.trim().toLowerCase());
+            // "Please wait N seconds before requesting another code": N is the time really left.
+            const wait = Number(/(\d+) second/.exec(error.message)?.[1]);
+            goToVerification(email.trim().toLowerCase(), Number.isFinite(wait) && wait > 0 ? wait : 60);
             return;
           }
 

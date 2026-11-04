@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import {
   Bell,
+  FolderMinus,
   FolderPlus,
   MessageSquare,
   ArrowRightLeft,
   UserCheck,
+  UserCog,
+  UserMinus,
   type LucideIcon,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,17 +15,25 @@ import { ROLE_BASE_PATH } from '@/lib/auth/navigation';
 import type { Role } from '@/types/auth';
 import type { AppNotification } from '@/types/notification';
 import { cn } from '@/utils/cn';
-import { formatRelativeTime } from '@/utils/format';
+import { formatRelativeTime, readableMessage } from '@/utils/format';
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   TASK_ASSIGNED: UserCheck,
   TASK_STATUS_CHANGED: ArrowRightLeft,
   TASK_COMMENT: MessageSquare,
+  TASK_UNASSIGNED: UserMinus,
   PROJECT_MEMBER_ADDED: FolderPlus,
+  PROJECT_MEMBER_REMOVED: FolderMinus,
+  PROJECT_MANAGER_ASSIGNED: UserCog,
+  PROJECT_MANAGER_REMOVED: UserMinus,
 };
+
+// After these the person no longer has access to the item, so there is nowhere to go.
+const NO_LINK_TYPES = new Set(['TASK_UNASSIGNED', 'PROJECT_MEMBER_REMOVED', 'PROJECT_MANAGER_REMOVED']);
 
 /** Where clicking a notification should go: its task, else its project, else nowhere. */
 export function notificationHref(notification: AppNotification, role: Role): string | null {
+  if (NO_LINK_TYPES.has(notification.type)) return null;
   const base = ROLE_BASE_PATH[role];
   if (notification.taskId) return `${base}/tasks/${notification.taskId}`;
   if (notification.projectId) return `${base}/projects/${notification.projectId}`;
@@ -53,7 +64,7 @@ export function NotificationItem({ notification, role, onOpen }: NotificationIte
       </span>
       <span className="min-w-0 flex-1">
         <span className={cn('block break-words text-sm', unread && 'font-medium')}>
-          {notification.message}
+          {readableMessage(notification.message)}
         </span>
         <time
           dateTime={notification.createdAt}
