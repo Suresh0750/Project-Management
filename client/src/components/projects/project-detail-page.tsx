@@ -84,6 +84,7 @@ function Overview({ project }: { project: ProjectDetail }) {
             <PriorityBadge priority={project.priority} />
           </div>
           {fact('Project Manager', project.manager.name)}
+          {fact('Created by', project.createdBy.name)}
           {fact('Start date', project.startDate ? formatCalendarDate(project.startDate) : 'Not set')}
           {fact('Deadline', project.deadline ? formatCalendarDate(project.deadline) : 'Not set')}
           {fact('Members', String(project.memberCount))}

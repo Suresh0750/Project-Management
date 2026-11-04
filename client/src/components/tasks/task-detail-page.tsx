@@ -63,7 +63,7 @@ export function TaskDetailPage({ role }: { role: Role }) {
   const tasksPath = `${base}/tasks`;
 
   const canAssign = task.data?.permissions.canAssign ?? false;
-  const project = useProject(task.data?.projectId ?? '', canAssign);
+  const project = useProject(task.data?.projectId ?? '', canAssign && editing);
   const assigneeOptions = useMemo(
     () =>
       (project.data?.members ?? [])
@@ -227,7 +227,8 @@ export function TaskDetailPage({ role }: { role: Role }) {
         </div>
 
         <aside className="h-fit space-y-5 rounded-xl border border-border bg-surface p-6">
-          {permissions.canChangeStatus ? (
+          {/* Status and assignee can only be changed after pressing Edit; otherwise they are shown as text. */}
+          {editing && permissions.canChangeStatus ? (
             <SelectField
               label="Status"
               options={STATUS_OPTIONS}
@@ -239,7 +240,7 @@ export function TaskDetailPage({ role }: { role: Role }) {
             <dl>{row('Status', <TaskStatusBadge status={data.status} />)}</dl>
           )}
 
-          {permissions.canAssign ? (
+          {editing && permissions.canAssign ? (
             <SelectField
               label="Assignee"
               placeholder="Unassigned"

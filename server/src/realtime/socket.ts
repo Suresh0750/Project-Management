@@ -64,7 +64,7 @@ async function authenticateSocket(socket: Socket, next: (error?: Error) => void)
           select: {
             userId: true,
             expiresAt: true,
-            user: { select: { id: true, role: true, isActive: true, tokenVersion: true } },
+            user: { select: { id: true, role: true, isActive: true } },
           },
         })
       : null;
@@ -74,8 +74,7 @@ async function authenticateSocket(socket: Socket, next: (error?: Error) => void)
       session.userId !== payload.sub ||
       session.expiresAt <= new Date() ||
       !user ||
-      !user.isActive ||
-      user.tokenVersion !== payload.tv
+      !user.isActive
     ) {
       next(new Error('unauthorized'));
       return;

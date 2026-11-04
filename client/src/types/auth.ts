@@ -1,3 +1,4 @@
+import type { UserProjectRef } from '@/types/project';
 export const ROLES = ['ADMIN', 'PROJECT_MANAGER', 'MEMBER'] as const;
 
 export type Role = (typeof ROLES)[number];

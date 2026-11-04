@@ -16,6 +16,7 @@ async function runCleanup(): Promise<void> {
   try {
     const removed = await deleteExpiredOtps();
     if (removed > 0) console.info(`[cleanup] removed ${removed} expired verification code(s)`);
+    await prisma.passwordReset.deleteMany({ where: { expiresAt: { lt: new Date() } } });
     const sessions = await deleteExpiredSessions();
     if (sessions > 0) console.info(`[cleanup] removed ${sessions} expired session(s)`);
   } catch (error) {

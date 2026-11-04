@@ -22,7 +22,6 @@ export interface AuthUser {
 export interface JwtAccessPayload {
   sub: string;   // userId
   sid: string;   // session id
-  tv: number;    // tokenVersion
   email: string;
   role: Role;
   iat?: number;
@@ -32,7 +31,6 @@ export interface JwtAccessPayload {
 export interface JwtRefreshPayload {
   sub: string;   // userId
   sid: string;   // session id
-  tv: number;    // tokenVersion
   iat?: number;
   exp?: number;
 }

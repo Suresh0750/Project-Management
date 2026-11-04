@@ -47,7 +47,9 @@ export function useUser(id: string) {
 }
 
 function syncUser(queryClient: QueryClient, user: AuthUser) {
-  queryClient.setQueryData(usersKeys.detail(user.id), user);
+  // Merge, so details only the detail endpoint returns (pending email change, role lock) survive
+  // responses that do not repeat them (e.g. activate/deactivate).
+  queryClient.setQueryData<AuthUser>(usersKeys.detail(user.id), (current) => ({ ...current, ...user }));
   void queryClient.invalidateQueries({ queryKey: [...usersKeys.all, 'list'] });
 }
 

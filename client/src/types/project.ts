@@ -20,6 +20,15 @@ export const PRIORITY_LABEL: Record<Priority, string> = {
   URGENT: 'Urgent',
 };
 
+/** Just enough of a project to list it and link to it. */
+export interface UserProjectRef {
+  id: string;
+  name: string;
+  status: ProjectStatus;
+  priority: Priority;
+  archivedAt: string | null;
+}
+
 export interface PersonRef {
   id: string;
   name: string;
@@ -39,6 +48,8 @@ export interface Project {
   updatedAt: string;
   managerId: string;
   manager: PersonRef;
+  /** Who created the project (not always the manager: an admin can create it for a manager). */
+  createdBy: PersonRef;
   memberCount: number;
   taskCount: number;
   completedTaskCount: number;

@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast-provider';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { EmailVerifiedBadge, RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
 import { EmailChangePanel } from '@/components/users/email-change-panel';
+import { UserProjectsCard } from '@/components/users/user-projects-card';
 import { startCountdown } from '@/hooks/use-countdown';
 import { UserForm } from '@/components/users/user-form';
 import { useSession } from '@/features/auth/hooks';
@@ -67,7 +68,7 @@ export function UserDetailPage() {
     ? 'You cannot change your own role.'
     : isAdminAccount
       ? 'Administrator roles cannot be changed.'
-      : undefined;
+      : (target.roleLockedReason ?? undefined);
 
   const handleSave = async (values: UserFormValues) => {
     const payload: UpdateUserPayload = {};
@@ -177,6 +178,21 @@ export function UserDetailPage() {
             onSubmit={handleSave}
           />
         </section>
+
+        {!isAdminAccount && (
+          <div className="lg:col-start-2">
+            <UserProjectsCard
+              title={target.role === 'PROJECT_MANAGER' ? 'Projects managed' : 'Projects'}
+              projects={target.projects ?? []}
+              projectsPath="/admin/projects"
+              emptyMessage={
+                target.role === 'PROJECT_MANAGER'
+                  ? 'This Project Manager does not manage any project yet.'
+                  : 'This member has not been added to any project yet.'
+              }
+            />
+          </div>
+        )}
       </div>
 
       <ConfirmDialog

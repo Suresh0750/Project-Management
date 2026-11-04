@@ -160,6 +160,9 @@ export function TaskForm({
             options={projectOptions}
             disabled={projects.isPending}
             error={errors.projectId?.message ?? (projects.isError ? projects.error.message : undefined)}
+            // Controlled: the projects load after the page opens, and a plain <select> would stay on
+            // the placeholder even though the preset project (from ?projectId=) is in the form.
+            value={projectId}
             {...register('projectId', { onChange: () => setValue('assigneeId', '') })}
           />
           <SelectField

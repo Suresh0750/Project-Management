@@ -6,6 +6,8 @@ import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
+import { UserProjectsCard } from '@/components/users/user-projects-card';
+import { useProjects } from '@/features/projects/hooks';
 import { useSession } from '@/features/auth/hooks';
 import { ROLE_BASE_PATH } from '@/lib/auth/navigation';
 import type { Role } from '@/types/auth';
@@ -14,6 +16,9 @@ import { formatDate } from '@/utils/format';
 export function ProfilePage({ role }: { role: Role }) {
   const base = ROLE_BASE_PATH[role];
   const session = useSession();
+  // The projects API is scoped by role: a manager gets the projects they manage, a member the
+  // ones they belong to. Administrators see every project elsewhere, so nothing is listed here.
+  const projects = useProjects({ page: 1, limit: 100, archived: false }, role !== 'ADMIN');
 
   let body;
   if (session.isPending) {
@@ -61,6 +66,31 @@ export function ProfilePage({ role }: { role: Role }) {
           {/* Remount when the saved profile changes so the form baseline stays correct. */}
           <ProfileForm key={`${user.updatedAt}-${user.email}`} user={user} />
         </section>
+
+        {role !== 'ADMIN' && (
+          <div className="lg:col-start-2">
+            {projects.isPending ? (
+              <Skeleton className="h-40 w-full" />
+            ) : projects.isError ? (
+              <ErrorState
+                message={projects.error.message}
+                onRetry={() => projects.refetch()}
+                retrying={projects.isFetching}
+              />
+            ) : (
+              <UserProjectsCard
+                title={role === 'PROJECT_MANAGER' ? 'Projects you manage' : 'Your projects'}
+                projects={projects.data.items}
+                projectsPath={`${base}/projects`}
+                emptyMessage={
+                  role === 'PROJECT_MANAGER'
+                    ? 'You do not manage any project yet.'
+                    : 'You have not been added to any project yet.'
+                }
+              />
+            )}
+          </div>
+        )}
       </div>
     );
   }
