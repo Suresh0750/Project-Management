@@ -36,7 +36,10 @@ export function LoginForm() {
   // deactivated or the session expired), so there is nothing to ask the server. Asking again would
   // cost a request plus a refresh attempt and flash a skeleton before the form.
   const sessionKnownEnded =
-    reason === 'deactivated' || reason === 'expired' || reason === 'role-changed';
+    reason === 'deactivated' ||
+    reason === 'expired' ||
+    reason === 'role-changed' ||
+    reason === 'verified';
   const session = useSession(!sessionKnownEnded);
   const login = useLogin();
   const [formError, setFormError] = useState<string | null>(null);
@@ -121,6 +124,9 @@ export function LoginForm() {
           Your role has been changed by an administrator, so you were signed out. Sign in again to
           continue.
         </Alert>
+      )}
+      {reason === 'verified' && !formError && (
+        <Alert tone="success">Your email address is already verified. Sign in to continue.</Alert>
       )}
       {reason === 'expired' && !formError && (
         <Alert tone="info">Your session has ended. Please sign in again.</Alert>

@@ -62,8 +62,16 @@ export async function verifyEmail(input: VerifyEmailInput, userAgent?: string) {
     ]);
 
   const user = await prisma.user.findUnique({ where: { email: input.email } });
-  // Unknown and already-verified accounts get the same answer as a wrong code.
-  if (!user || user.emailVerifiedAt) throw invalid();
+  // Unknown accounts get the same answer as a wrong code.
+  if (!user) throw invalid();
+  // Already verified (for example the code was entered on another device first): say so, so the
+  // page can send the person to sign in. Registering already tells callers that a verified
+  // address is taken, so this reveals nothing new.
+  if (user.emailVerifiedAt) {
+    throw new HttpError(409, 'This email address is already verified. Please sign in.', [
+      { path: 'code', message: 'EMAIL_ALREADY_VERIFIED' },
+    ]);
+  }
   if (!user.isActive) {
     throw accountDeactivated();
   }

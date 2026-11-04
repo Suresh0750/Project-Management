@@ -67,6 +67,11 @@ export function VerifyEmailForm() {
       },
       onError: (raw) => {
         const error = asApiError(raw);
+        // Verified elsewhere in the meantime (another browser or device): nothing left to do here.
+        if (error.fieldErrors.code === 'EMAIL_ALREADY_VERIFIED') {
+          router.replace('/login?reason=verified');
+          return;
+        }
         const otpMessage = error.fieldErrors.otp;
         if (otpMessage) {
           setError('otp', { message: otpMessage });
