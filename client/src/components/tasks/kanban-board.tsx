@@ -138,18 +138,18 @@ function Column({
     <section
       aria-label={`${TASK_STATUS_LABEL[status]}, ${tasks.length} tasks`}
       className={cn(
-        'flex w-72 shrink-0 flex-col rounded-xl border bg-surface-muted/60 lg:w-auto',
+        'flex h-full min-h-0 w-72 shrink-0 flex-col rounded-xl border bg-surface-muted/60 lg:w-auto',
         isOver ? 'border-primary' : 'border-border',
       )}
     >
-      <header className="flex items-center justify-between px-3 py-2.5">
+      <header className="flex shrink-0 items-center justify-between px-3 py-2.5">
         <h3 className="text-sm font-semibold">{TASK_STATUS_LABEL[status]}</h3>
         <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-muted-foreground">
           {tasks.length}
         </span>
       </header>
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-        <ul ref={setNodeRef} className="min-h-24 flex-1 space-y-2 px-2 pb-2">
+        <ul ref={setNodeRef} className="[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">
           {tasks.map((task) => (
             <SortableCard
               key={task.id}
@@ -306,7 +306,8 @@ export function KanbanBoard({ tasks, basePath }: KanbanBoardProps) {
       }}
     >
       <div
-        className="flex items-start gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible"
+        // Fixed height: the board never grows with the number of cards. Each column scrolls inside itself.
+        className="[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex h-[calc(100dvh-20rem)] min-h-96 items-stretch gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-4 lg:grid-rows-1 lg:overflow-x-visible"
         aria-busy={savingId !== null}
       >
         {TASK_STATUSES.map((status) => (
