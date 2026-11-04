@@ -110,14 +110,14 @@ export function TasksPage({ role }: { role: Role }) {
 
   const assigneeOptions = useMemo(
     () => [
-      { value: 'me', label: 'Assigned to me' },
+      ...(role === 'MEMBER' ? [{ value: 'me', label: 'Assigned to me' }] : []),
       { value: 'unassigned', label: 'Unassigned' },
       ...(selectedProject.data?.members ?? []).map((member) => ({
         value: member.id,
         label: member.name,
       })),
     ],
-    [selectedProject.data],
+    [role, selectedProject.data],
   );
 
   const debouncedSearch = useDebouncedValue(search.trim());
