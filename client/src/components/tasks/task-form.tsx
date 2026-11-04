@@ -11,7 +11,7 @@ import { TextField } from '@/components/ui/text-field';
 import { useProject, useProjects } from '@/features/projects/hooks';
 import { ApiError } from '@/lib/api/errors';
 import { taskFormSchema, type TaskFormValues } from '@/schemas/task';
-import { todayInputValue } from '@/utils/format';
+import { useToday } from '@/lib/use-today';
 import { PRIORITIES, PRIORITY_LABEL } from '@/types/project';
 import { TASK_STATUSES, TASK_STATUS_LABEL } from '@/types/task';
 
@@ -46,6 +46,7 @@ export function TaskForm({
   onCancel,
 }: TaskFormProps) {
   const isCreate = mode === 'create';
+  const today = useToday();
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -197,9 +198,8 @@ export function TaskForm({
             label="Due date"
             type="date"
             min={
-              defaultValues?.dueDate && defaultValues.dueDate < todayInputValue()
-                ? defaultValues.dueDate
-                : todayInputValue()
+              (defaultValues?.dueDate && defaultValues.dueDate < today ? defaultValues.dueDate : today) ||
+              undefined
             }
             error={errors.dueDate?.message}
             {...register('dueDate')}

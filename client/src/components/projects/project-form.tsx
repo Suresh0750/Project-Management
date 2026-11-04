@@ -9,7 +9,7 @@ import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { TextareaField } from '@/components/ui/textarea-field';
 import { TextField } from '@/components/ui/text-field';
 import { ApiError } from '@/lib/api/errors';
-import { todayInputValue } from '@/utils/format';
+import { useToday } from '@/lib/use-today';
 import { projectFormSchema, type ProjectFormValues } from '@/schemas/project';
 import {
   PRIORITIES,
@@ -78,7 +78,7 @@ export function ProjectForm({
   const startDate = useWatch({ control, name: 'startDate' });
   // On the create page nothing can be dated before today; editing keeps the dates already saved.
   const creating = !defaultValues;
-  const today = todayInputValue();
+  const today = useToday();
 
   // Cache Components can keep a page alive in the background after navigating away, so
   // discard entered data whenever the form goes away.
