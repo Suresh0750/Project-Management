@@ -96,6 +96,11 @@ export function asApiError(error: unknown): ApiError {
   return toApiError(error);
 }
 
+/** The server's "an administrator changed your role, sign in again" answer. */
+export function isRoleChanged(error: ApiError): boolean {
+  return error.status === 403 && error.fieldErrors.code === 'ROLE_CHANGED';
+}
+
 /** The server's "this account was deactivated" answer (see server/src/utils/accountErrors.ts). */
 export function isAccountDeactivated(error: ApiError): boolean {
   return error.status === 403 && error.fieldErrors.code === 'ACCOUNT_DEACTIVATED';

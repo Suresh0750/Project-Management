@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { prisma } from '../../prisma/client.js';
-import { accountDeactivated } from '../utils/accountErrors.js';
+import { ROLE_CHANGED_CODE, accountDeactivated, roleChanged } from '../utils/accountErrors.js';
 import { clearAuthCookies } from '../utils/cookies.js';
 import { HttpError } from '../utils/httpError.js';
 import { verifyAccessToken } from '../utils/jwt.js';
@@ -35,6 +35,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
           select: {
             userId: true,
             expiresAt: true,
+            endedReason: true,
             user: {
               select: {
                 id: true,
@@ -51,6 +52,8 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     if (!session || session.userId !== payload.sub || session.expiresAt <= new Date()) {
       throw sessionOver(new HttpError(401, 'Session has been revoked'));
     }
+    // An administrator ended this session on purpose: say why, and drop the dead cookies.
+    if (session.endedReason === ROLE_CHANGED_CODE) throw sessionOver(roleChanged());
     const user = session.user;
 
     if (!user) throw sessionOver(new HttpError(401, 'User not found'));

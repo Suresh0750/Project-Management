@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
-import { accountDeactivated } from '../../utils/accountErrors.js';
+import { ROLE_CHANGED_CODE, accountDeactivated, roleChanged } from '../../utils/accountErrors.js';
 import { HttpError } from '../../utils/httpError.js';
 import { verifyAccessToken, verifyRefreshToken } from '../../utils/jwt.js';
 import { env } from '../../config/env.js';
@@ -161,6 +161,7 @@ export async function refresh(refreshToken: string) {
         select: {
           userId: true,
           expiresAt: true,
+          endedReason: true,
           user: { select: SAFE_USER_SELECT },
         },
       })
@@ -168,6 +169,7 @@ export async function refresh(refreshToken: string) {
   if (!session || session.userId !== payload.sub || session.expiresAt <= new Date()) {
     throw new HttpError(401, 'Session has been revoked');
   }
+  if (session.endedReason === ROLE_CHANGED_CODE) throw roleChanged();
   const record = session.user;
 
   if (!record) throw new HttpError(401, 'User not found');

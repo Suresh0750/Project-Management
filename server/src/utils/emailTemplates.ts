@@ -216,6 +216,31 @@ export function verificationEmail({
   });
 }
 
+interface RoleChangedArgs {
+  name: string;
+  email: string;
+  oldRole: string;
+  newRole: string;
+}
+
+/** Sent when an administrator changes someone's role. They are signed out and sign in again. */
+export function roleChangedEmail({ name, email, oldRole, newRole }: RoleChangedArgs): EmailContent {
+  const base = env.CLIENT_URL.replace(/\/$/, '');
+  return build('Your ProjectFlow role has changed', {
+    preheader: `Your role is now ${newRole}. Sign in again to continue.`,
+    badge: { label: 'Role changed', tone: 'info' },
+    heading: 'Your role has changed',
+    paragraphs: [
+      `Hi ${name},`,
+      `An administrator changed your ProjectFlow role from ${oldRole} to ${newRole}.`,
+      'For your security you have been signed out on every device. Sign in again to continue with your new role.',
+    ],
+    button: { label: 'Sign in', url: `${base}/login` },
+    notes: ["If you weren't expecting this, contact your administrator."],
+    footer: footerFor(email),
+  });
+}
+
 interface AccountStatusArgs {
   name: string;
   email: string;

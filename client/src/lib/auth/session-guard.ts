@@ -1,9 +1,15 @@
 import { clearTokens } from '@/lib/auth/token-store';
 import { disconnectSocket } from '@/lib/socket/client';
 
-export type SessionEndReason = 'deactivated';
+export type SessionEndReason = 'deactivated' | 'role-changed';
 
 let ended = false;
+let endedBecause: SessionEndReason | null = null;
+
+/** Why the session ended on this page, once it has. */
+export function sessionEndReason(): SessionEndReason | null {
+  return endedBecause;
+}
 
 /** True once the session was ended on this page; the API client then refuses to send anything. */
 export function isSessionEnded(): boolean {
@@ -24,6 +30,7 @@ export function endSession(reason: SessionEndReason): void {
   if (`${window.location.pathname}${window.location.search}` === target) return;
 
   ended = true;
+  endedBecause = reason;
   clearTokens();
   disconnectSocket();
   window.location.replace(target);

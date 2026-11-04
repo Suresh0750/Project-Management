@@ -63,6 +63,14 @@ export async function endSession(sessionId: string): Promise<void> {
   await prisma.session.deleteMany({ where: { id: sessionId } });
 }
 
+/**
+ * Ends every session of a user but keeps the rows, tagged with the reason, so the next request
+ * from any of their devices can be answered with an explanation. The rows expire normally.
+ */
+export async function markSessionsEnded(userId: string, reason: string): Promise<void> {
+  await prisma.session.updateMany({ where: { userId }, data: { endedReason: reason } });
+}
+
 /** Sign out everywhere: password change, deactivation. */
 export async function endAllSessions(userId: string): Promise<void> {
   await prisma.session.deleteMany({ where: { userId } });

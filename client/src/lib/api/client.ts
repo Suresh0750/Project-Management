@@ -1,7 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { publicEnv } from '@/lib/env';
-import { ApiError, isAccountDeactivated, toApiError } from '@/lib/api/errors';
-import { endSession, isSessionEnded } from '@/lib/auth/session-guard';
+import { ApiError, isAccountDeactivated, isRoleChanged, toApiError } from '@/lib/api/errors';
+import { endSession, isSessionEnded, sessionEndReason } from '@/lib/auth/session-guard';
 import { clearTokens, getTokens, setTokens, type StoredTokens } from '@/lib/auth/token-store';
 
 export const apiClient = axios.create({
@@ -17,6 +17,11 @@ export const apiClient = axios.create({
 // trying to call the API is refused here, before it reaches the network.
 apiClient.interceptors.request.use((config) => {
   if (isSessionEnded()) {
+    if (sessionEndReason() === 'role-changed') {
+      throw new ApiError('Your role has been changed. Please sign in again.', 403, {
+        code: 'ROLE_CHANGED',
+      });
+    }
     throw new ApiError(
       'Your account has been deactivated. Please contact your administrator or the support team.',
       403,
@@ -79,6 +84,12 @@ apiClient.interceptors.response.use(
     if (isAccountDeactivated(apiError)) {
       const url = axios.isAxiosError(error) ? error.config?.url : undefined;
       if (!CREDENTIAL_PATHS.some((path) => url?.startsWith(path))) endSession('deactivated');
+      throw apiError;
+    }
+
+    // Role changed by an administrator: same handling, with its own message on the login page.
+    if (isRoleChanged(apiError)) {
+      endSession('role-changed');
       throw apiError;
     }
 

@@ -131,6 +131,9 @@ model Session {
   createdAt  DateTime @default(now())
   lastUsedAt DateTime @default(now())
   expiresAt  DateTime
+  // Set when an administrator ended the session on purpose (e.g. 'ROLE_CHANGED'). The row is kept
+  // so the next request can say why the person was signed out, instead of a bare "expired".
+  endedReason String? @db.VarChar(32)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

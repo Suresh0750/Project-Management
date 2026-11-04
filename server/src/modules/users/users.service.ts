@@ -4,9 +4,10 @@ import { prisma } from '../../../prisma/client.js';
 import { env } from '../../config/env.js';
 import { disconnectUserSockets } from '../../realtime/socket.js';
 import { consumeOtp, issueOtp } from '../auth/otp.service.js';
-import { endAllSessions } from '../auth/session.service.js';
+import { endAllSessions, markSessionsEnded } from '../auth/session.service.js';
+import { ROLE_CHANGED_CODE } from '../../utils/accountErrors.js';
 import { HttpError } from '../../utils/httpError.js';
-import { accountStatusEmail } from '../../utils/emailTemplates.js';
+import { accountStatusEmail, roleChangedEmail } from '../../utils/emailTemplates.js';
 import { sendMail } from '../../utils/mailer.js';
 import { SAFE_USER_SELECT, DEFAULT_PAGE, DEFAULT_LIMIT } from '../../constants.js';
 import type {
@@ -16,6 +17,12 @@ import type {
 } from './users.validation.js';
 
 const SALT_ROUNDS = 12;
+
+const ROLE_LABEL: Record<Role, string> = {
+  ADMIN: 'Administrator',
+  PROJECT_MANAGER: 'Project Manager',
+  MEMBER: 'Member',
+};
 
 // ─── List users (Admin only) ──────────────────────────────────────────────────
 export async function listUsers(query: ListUsersQuery) {
@@ -248,8 +255,23 @@ export async function updateUser(id: string, input: UpdateUserInput, requesterId
         : await prisma.user.findUniqueOrThrow({ where: { id }, select: SAFE_USER_SELECT });
     const pendingEmail = emailChange?.newEmail ?? (await findPendingEmail(id));
     if (roleChanged) {
-      // Live connections joined their rooms by the old role: reconnect so they join the right ones.
+      // Sign the person out everywhere: their open pages and live connections were set up for the
+      // old role. The sessions are tagged, so their next request explains why they were signed out.
+      await markSessionsEnded(id, ROLE_CHANGED_CODE);
       disconnectUserSockets(id);
+
+      // Best effort and off the request path, like the deactivation email.
+      void sendMail({
+        to: user.email,
+        ...roleChangedEmail({
+          name: user.name,
+          email: user.email,
+          oldRole: ROLE_LABEL[target.role],
+          newRole: ROLE_LABEL[user.role],
+        }),
+      }).catch((error: unknown) => {
+        console.error('Could not send the role changed email', error);
+      });
     }
     const roleLockedReason = await roleChangeBlocker(user);
     const projects = await projectsOf(user);

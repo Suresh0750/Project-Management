@@ -48,6 +48,7 @@ export function RoleLayout({ role, children }: { role: Role; children: ReactNode
   const user = session.data;
   const unauthenticated = session.error?.status === 401 || session.error?.status === 403;
   const deactivated = session.error?.fieldErrors.code === 'ACCOUNT_DEACTIVATED';
+  const roleChanged = session.error?.fieldErrors.code === 'ROLE_CHANGED';
 
   // Guards against running the redirect more than once while state is still settling.
   const leaving = useRef(false);
@@ -56,7 +57,9 @@ export function RoleLayout({ role, children }: { role: Role; children: ReactNode
     if (unauthenticated) {
       const target = deactivated
         ? '/login?reason=deactivated'
-        : `/login?next=${encodeURIComponent(pathname)}${user ? '&reason=expired' : ''}`;
+        : roleChanged
+          ? '/login?reason=role-changed'
+          : `/login?next=${encodeURIComponent(pathname)}${user ? '&reason=expired' : ''}`;
 
       // Never navigate to the page we are already on.
       if (`${window.location.pathname}${window.location.search}` === target) return;
@@ -78,7 +81,7 @@ export function RoleLayout({ role, children }: { role: Role; children: ReactNode
     } else if (user && user.role !== role) {
       router.replace(ROLE_HOME[user.role]);
     }
-  }, [unauthenticated, deactivated, user, role, pathname, router]);
+  }, [unauthenticated, deactivated, roleChanged, user, role, pathname, router]);
 
   if (session.isError && !unauthenticated) {
     return (
