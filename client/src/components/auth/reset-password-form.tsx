@@ -28,6 +28,7 @@ export function ResetPasswordForm() {
     handleSubmit,
     setError,
     reset,
+    setValue,
     trigger,
     getValues,
     control,
@@ -44,7 +45,15 @@ export function ResetPasswordForm() {
   const { remaining, start } = useCountdown(`reset:${(typedEmail ?? '').trim().toLowerCase()}`);
 
   // Never leave a typed code or password behind when the page goes away.
-  useEffect(() => () => reset({ email: '', otp: '', password: '', confirmPassword: '' }), [reset]);
+  useEffect(() => {
+    if (initialEmail) setValue('email', initialEmail);
+  }, [initialEmail, setValue]);
+
+  // The typed code and passwords are discarded; the address from the link is kept (see verify page).
+  useEffect(
+    () => () => reset({ email: initialEmail, otp: '', password: '', confirmPassword: '' }),
+    [reset, initialEmail],
+  );
 
   const onSubmit = ({ email, otp, password }: ResetPasswordValues) => {
     setFormError(null);
