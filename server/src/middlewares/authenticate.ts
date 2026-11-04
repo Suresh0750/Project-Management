@@ -4,6 +4,7 @@ import { ROLE_CHANGED_CODE, accountDeactivated, roleChanged } from '../utils/acc
 import { clearAuthCookies } from '../utils/cookies.js';
 import { HttpError } from '../utils/httpError.js';
 import { verifyAccessToken } from '../utils/jwt.js';
+import { setRequestUser } from '../utils/requestContext.js';
 import { ACCESS_TOKEN_COOKIE } from '../constants.js';
 
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -61,6 +62,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     if (!user.emailVerifiedAt) throw new HttpError(403, 'Email address is not verified');
     const { emailVerifiedAt: _emailVerifiedAt, ...authUser } = user;
     req.user = authUser;
+    setRequestUser(authUser.id);
     next();
   } catch (err) {
     next(err);

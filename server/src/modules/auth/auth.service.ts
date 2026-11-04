@@ -1,3 +1,4 @@
+import { logError } from '../../utils/logger.js';
 import bcrypt from 'bcryptjs';
 import { Role, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
@@ -49,7 +50,7 @@ export async function register(input: RegisterInput) {
       select: { id: true, name: true, email: true },
     }));
 
-  const { resendAfterSeconds } = await issueOtp(user);
+  const { resendAfterSeconds } = await issueOtp(user, 'SIGNUP');
   return { email: user.email, resendAfterSeconds };
 }
 
@@ -67,7 +68,7 @@ export async function verifyEmail(input: VerifyEmailInput, userAgent?: string) {
     throw accountDeactivated();
   }
 
-  await consumeOtp(user.id, input.otp);
+  await consumeOtp(user.id, 'SIGNUP', input.otp);
 
   const verified = await prisma.user.update({
     where: { id: user.id },
@@ -97,7 +98,7 @@ export async function resendOtp(email: string) {
   if (!user || user.emailVerifiedAt || !user.isActive) {
     return { resendAfterSeconds: env.OTP_RESEND_COOLDOWN_SECONDS };
   }
-  return issueOtp(user);
+  return issueOtp(user, 'SIGNUP');
 }
 
 // ─── Login ────────────────────────────────────────────────────────────────────
@@ -119,9 +120,9 @@ export async function login(input: LoginInput, userAgent?: string) {
   // Correct password but unverified email: send a fresh code (if the cooldown allows) and tell
   // the client to continue on the verification screen.
   if (!user.emailVerifiedAt) {
-    await issueOtp(user).catch((error: unknown) => {
+    await issueOtp(user, 'SIGNUP').catch((error: unknown) => {
       if (!(error instanceof HttpError && error.statusCode === 429)) {
-        console.error('Could not send verification code during login', error);
+        logError('Could not send verification code during login', error);
       }
     });
     throw new HttpError(403, 'Please verify your email address to continue', [

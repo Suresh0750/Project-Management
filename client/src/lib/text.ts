@@ -17,3 +17,13 @@ export function cleanLine(value: string): string {
 /** Use as `lineString().pipe(z.string().min(2).max(100))`: the length rules see the cleaned value. */
 export const lineString = () => z.string().transform(cleanLine);
 export const textString = () => z.string().transform(cleanText);
+
+/**
+ * Upper-cases the first letter of every word ("john smith" -> "John Smith"). The rest of each word
+ * is left as typed, so "McDonald" is not turned into "Mcdonald".
+ */
+export function capitalizeWords(value: string): string {
+  return value.replace(/(^|[\s'’-])(\p{Ll})/gu, (_match, before: string, letter: string) =>
+    before + letter.toUpperCase(),
+  );
+}

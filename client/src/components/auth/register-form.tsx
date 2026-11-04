@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { PasswordField } from '@/components/ui/password-field';
 import { PasswordRequirements } from '@/components/ui/password-requirements';
 import { startCountdown } from '@/hooks/use-countdown';
+import { capitalizeWords } from '@/lib/text';
 import { generateMemorablePassword } from '@/utils/password';
 import { TextField } from '@/components/ui/text-field';
 import { useRegister } from '@/features/auth/hooks';
@@ -102,7 +103,18 @@ export function RegisterForm() {
         label="Full name"
         autoComplete="name"
         error={errors.name?.message}
-        {...register('name')}
+        {...register('name', {
+          // Capitalise as they type. Setting the value moves the caret to the end, so put it back.
+          onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+            const input = event.target;
+            const caret = input.selectionStart;
+            const capitalised = capitalizeWords(input.value);
+            if (capitalised !== input.value) {
+              input.value = capitalised;
+              input.setSelectionRange(caret, caret);
+            }
+          },
+        })}
       />
       <TextField
         label="Email"

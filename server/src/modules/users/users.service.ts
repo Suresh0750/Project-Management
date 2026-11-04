@@ -1,3 +1,4 @@
+import { logError } from '../../utils/logger.js';
 import bcrypt from 'bcryptjs';
 import { ProjectStatus, Role, type Prisma } from '@prisma/client';
 import { Outbox } from '../../realtime/outbox.js';
@@ -153,8 +154,8 @@ async function projectsOf(user: { id: string; role: Role }) {
 async function findPendingEmailChange(
   userId: string,
 ): Promise<{ newEmail: string; resendAfterSeconds: number } | null> {
-  const pending = await prisma.emailVerification.findUnique({
-    where: { userId },
+  const pending = await prisma.otpCode.findUnique({
+    where: { userId_purpose: { userId, purpose: 'EMAIL_CHANGE' } },
     select: { newEmail: true, expiresAt: true, sentAt: true },
   });
   if (!pending?.newEmail || pending.expiresAt.getTime() <= Date.now()) return null;
@@ -237,7 +238,8 @@ export async function updateUser(id: string, input: UpdateUserInput, requesterId
     const newEmail = input.email as string;
     const { resendAfterSeconds } = await issueOtp(
       { id, name: input.name ?? target.name, email: target.email },
-      newEmail,
+      'EMAIL_CHANGE',
+      { newEmail },
     );
     emailChange = { newEmail, resendAfterSeconds };
   }
@@ -272,7 +274,7 @@ export async function updateUser(id: string, input: UpdateUserInput, requesterId
           newRole: ROLE_LABEL[user.role],
         }),
       }).catch((error: unknown) => {
-        console.error('Could not send the role changed email', error);
+        logError('Could not send the role changed email', error);
       });
     }
     const roleLockedReason = await roleChangeBlocker(user);
@@ -285,12 +287,12 @@ export async function updateUser(id: string, input: UpdateUserInput, requesterId
 }
 
 async function cancelPendingEmail(userId: string): Promise<void> {
-  await prisma.emailVerification.deleteMany({ where: { userId, newEmail: { not: null } } });
+  await prisma.otpCode.deleteMany({ where: { userId, purpose: 'EMAIL_CHANGE' } });
 }
 
 async function requirePendingEmail(id: string) {
-  const pending = await prisma.emailVerification.findUnique({
-    where: { userId: id },
+  const pending = await prisma.otpCode.findUnique({
+    where: { userId_purpose: { userId: id, purpose: 'EMAIL_CHANGE' } },
     select: { newEmail: true },
   });
   if (!pending?.newEmail) {
@@ -305,7 +307,7 @@ export async function confirmEmailChange(id: string, otp: string) {
   if (!user) throw new HttpError(404, 'User not found');
   await requirePendingEmail(id);
 
-  const { newEmail } = await consumeOtp(id, otp);
+  const { newEmail } = await consumeOtp(id, 'EMAIL_CHANGE', otp);
   if (!newEmail) throw new HttpError(400, 'There is no email change waiting for a code.');
 
   try {
@@ -330,7 +332,7 @@ export async function resendEmailChangeCode(id: string) {
   if (!user) throw new HttpError(404, 'User not found');
   const newEmail = await requirePendingEmail(id);
 
-  const { resendAfterSeconds } = await issueOtp(user, newEmail);
+  const { resendAfterSeconds } = await issueOtp(user, 'EMAIL_CHANGE', { newEmail });
   return { newEmail, resendAfterSeconds };
 }
 
@@ -418,7 +420,7 @@ export async function updateUserStatus(
         supportEmail: env.SUPPORT_EMAIL,
       }),
     }).catch((error: unknown) => {
-      console.error('Could not send the account status email', error);
+      logError('Could not send the account status email', error);
     });
   }
 

@@ -1,3 +1,4 @@
+import { logError } from '../utils/logger.js';
 import {
   emitToProject,
   emitToUser,
@@ -54,7 +55,7 @@ export class Outbox {
       }
       for (const [userId, projectId] of this.leaves) leaveProjectRoom(userId, projectId);
     } catch (error) {
-      console.error('Realtime publish failed', error);
+      logError('Realtime publish failed', error);
     }
   }
 }
