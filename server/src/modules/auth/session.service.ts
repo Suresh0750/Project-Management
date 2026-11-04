@@ -2,19 +2,19 @@ import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import type { Role } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
+import { HttpError } from '../../utils/httpError.js';
 import { signAccessToken, signRefreshToken } from '../../utils/jwt.js';
 
 /**
  * One Session row per signed-in browser/device. Both tokens carry its id (`sid`), so logging out
  * on one device deletes only that row and leaves the user's other devices signed in.
- * `User.tokenVersion` stays as the "sign out everywhere" switch (password change, deactivation).
+ * Signing a user out everywhere (password change, deactivation) deletes all of their rows.
  */
 
 interface TokenSubject {
   id: string;
   email: string;
   role: Role;
-  tokenVersion: number;
 }
 
 export interface IssuedTokens {
@@ -23,12 +23,11 @@ export interface IssuedTokens {
 }
 
 function sign(user: TokenSubject, sessionId: string): IssuedTokens & { expiresAt: Date } {
-  const refreshToken = signRefreshToken(user.id, user.tokenVersion, sessionId);
+  const refreshToken = signRefreshToken(user.id, sessionId);
   const accessToken = signAccessToken({
     sub: user.id,
     email: user.email,
     role: user.role,
-    tokenVersion: user.tokenVersion,
     sessionId,
   });
   // The row expires exactly when its refresh token does.
@@ -49,10 +48,13 @@ export async function startSession(user: TokenSubject, userAgent?: string): Prom
 /** Refresh: rotates the token pair of an existing session and pushes its expiry forward. */
 export async function renewSession(user: TokenSubject, sessionId: string): Promise<IssuedTokens> {
   const { expiresAt, ...tokens } = sign(user, sessionId);
-  await prisma.session.update({
+  // updateMany: if the session was deleted a moment ago (logout, password change), refuse
+  // instead of failing with a database error.
+  const { count } = await prisma.session.updateMany({
     where: { id: sessionId },
     data: { expiresAt, lastUsedAt: new Date() },
   });
+  if (count === 0) throw new HttpError(401, 'Session has been revoked');
   return tokens;
 }
 
@@ -61,7 +63,7 @@ export async function endSession(sessionId: string): Promise<void> {
   await prisma.session.deleteMany({ where: { id: sessionId } });
 }
 
-/** Sign out everywhere (used together with a tokenVersion bump). */
+/** Sign out everywhere: password change, deactivation. */
 export async function endAllSessions(userId: string): Promise<void> {
   await prisma.session.deleteMany({ where: { userId } });
 }

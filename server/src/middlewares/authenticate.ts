@@ -43,7 +43,6 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
                 role: true,
                 isActive: true,
                 emailVerifiedAt: true,
-                tokenVersion: true,
               },
             },
           },
@@ -57,11 +56,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     if (!user) throw sessionOver(new HttpError(401, 'User not found'));
     if (!user.isActive) throw sessionOver(accountDeactivated());
     if (!user.emailVerifiedAt) throw new HttpError(403, 'Email address is not verified');
-    if (payload.tv !== user.tokenVersion) {
-      throw sessionOver(new HttpError(401, 'Session has been revoked'));
-    }
-
-    const { tokenVersion: _tokenVersion, emailVerifiedAt: _emailVerifiedAt, ...authUser } = user;
+    const { emailVerifiedAt: _emailVerifiedAt, ...authUser } = user;
     req.user = authUser;
     next();
   } catch (err) {

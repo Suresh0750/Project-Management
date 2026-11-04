@@ -11,7 +11,7 @@ export default function ResetPasswordPage() {
   return (
     <AuthShell
       title="Set a new password"
-      description="Choose a strong password you have not used before."
+      description="Enter the code we emailed you, then choose a strong password."
       footer={
         <Link href="/login" className="font-medium text-primary hover:underline">
           Back to sign in

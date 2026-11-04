@@ -5,9 +5,11 @@ import { validate } from '../../middlewares/validate.js';
 import * as authController from './auth.controller.js';
 import {
   changePasswordSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
   resendOtpSchema,
+  resetPasswordSchema,
   updateProfileSchema,
   verifyEmailSchema,
 } from './auth.validation.js';
@@ -35,6 +37,12 @@ router.post('/verify-email', otpLimiter, validate(verifyEmailSchema), authContro
 
 // POST /api/auth/resend-otp
 router.post('/resend-otp', otpLimiter, validate(resendOtpSchema), authController.resendOtp);
+
+// POST /api/auth/forgot-password  (emails a one-time code; the answer never reveals if the account exists)
+router.post('/forgot-password', otpLimiter, validate(forgotPasswordSchema), authController.forgotPassword);
+
+// POST /api/auth/reset-password  (consumes the code and sets the new password)
+router.post('/reset-password', otpLimiter, validate(resetPasswordSchema), authController.resetPassword);
 
 // POST /api/auth/login
 router.post('/login', authLimiter, validate(loginSchema), authController.login);

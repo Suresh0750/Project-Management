@@ -20,6 +20,7 @@ const DEADLINE_MESSAGE = 'Deadline cannot be earlier than the start date';
 
 const projectInclude = {
   manager: { select: PERSON_SELECT },
+  createdBy: { select: PERSON_SELECT },
   _count: { select: { members: true, tasks: { where: { deletedAt: null } } } },
 } satisfies Prisma.ProjectInclude;
 

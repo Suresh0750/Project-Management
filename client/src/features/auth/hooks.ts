@@ -55,12 +55,14 @@ export function useLogout() {
 }
 
 export function useForgotPassword() {
-  return useMutation<void, ApiError, string>({ mutationFn: forgotPassword });
+  return useMutation<{ resendAfterSeconds: number }, ApiError, string>({
+    mutationFn: forgotPassword,
+  });
 }
 
 export function useResetPassword() {
-  return useMutation<void, ApiError, { token: string; password: string }>({
-    mutationFn: ({ token, password }) => resetPassword(token, password),
+  return useMutation<void, ApiError, { email: string; otp: string; password: string }>({
+    mutationFn: resetPassword,
   });
 }
 

@@ -11,6 +11,10 @@ export interface AuthUser {
   /** null until the email is verified (self-registered) — admin-created accounts are verified. */
   emailVerifiedAt: string | null;
   /** Admin user detail only: a new address waiting for its verification code. */
+  /** Admin user detail only: why the role cannot be changed right now (null when it can). */
+  roleLockedReason?: string | null;
+  /** Admin user detail only: projects a Project Manager manages / a Member belongs to. */
+  projects?: UserProjectRef[];
   pendingEmail?: string | null;
   /** With pendingEmail: seconds until another code may be requested. */
   emailChangeResendAfter?: number;
