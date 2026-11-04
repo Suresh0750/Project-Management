@@ -65,16 +65,34 @@ export async function getUserById(id: string) {
   });
 
   if (!user) throw new HttpError(404, 'User not found');
-  return { ...user, pendingEmail: await findPendingEmail(id) };
+  const pending = await findPendingEmailChange(id);
+  return {
+    ...user,
+    pendingEmail: pending?.newEmail ?? null,
+    // Seconds until another code may be requested, so a refresh does not restart the timer.
+    emailChangeResendAfter: pending?.resendAfterSeconds ?? 0,
+  };
 }
 
 /** The new address an administrator started changing to, while its code is still valid. */
-async function findPendingEmail(userId: string): Promise<string | null> {
+async function findPendingEmailChange(
+  userId: string,
+): Promise<{ newEmail: string; resendAfterSeconds: number } | null> {
   const pending = await prisma.emailVerification.findUnique({
     where: { userId },
-    select: { newEmail: true, expiresAt: true },
+    select: { newEmail: true, expiresAt: true, sentAt: true },
   });
-  return pending?.newEmail && pending.expiresAt.getTime() > Date.now() ? pending.newEmail : null;
+  if (!pending?.newEmail || pending.expiresAt.getTime() <= Date.now()) return null;
+
+  const elapsed = (Date.now() - pending.sentAt.getTime()) / 1000;
+  return {
+    newEmail: pending.newEmail,
+    resendAfterSeconds: Math.max(0, Math.ceil(env.OTP_RESEND_COOLDOWN_SECONDS - elapsed)),
+  };
+}
+
+async function findPendingEmail(userId: string): Promise<string | null> {
+  return (await findPendingEmailChange(userId))?.newEmail ?? null;
 }
 
 // ─── Create user (Admin only) ─────────────────────────────────────────────────

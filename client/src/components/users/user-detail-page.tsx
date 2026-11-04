@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast-provider';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { EmailVerifiedBadge, RoleBadge, UserStatusBadge } from '@/components/users/user-badges';
 import { EmailChangePanel } from '@/components/users/email-change-panel';
+import { startCountdown } from '@/hooks/use-countdown';
 import { UserForm } from '@/components/users/user-form';
 import { useSession } from '@/features/auth/hooks';
 import { useUpdateUser, useUpdateUserStatus, useUser } from '@/features/users/hooks';
@@ -36,8 +37,6 @@ export function UserDetailPage() {
   const updateUser = useUpdateUser(id);
   const updateStatus = useUpdateUserStatus();
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
-  // Cooldown of the code that was just sent (so "Resend" starts disabled).
-  const [codeCooldown, setCodeCooldown] = useState(0);
 
   if (user.isPending) return <DetailSkeleton />;
 
@@ -81,7 +80,7 @@ export function UserDetailPage() {
 
     const { user: updated, emailChange } = await updateUser.mutateAsync(payload);
     if (emailChange) {
-      setCodeCooldown(emailChange.resendAfterSeconds);
+      startCountdown(`emailchange:${target.id}`, emailChange.resendAfterSeconds);
       toast.success(`Code sent to ${emailChange.newEmail}. The email changes once it is entered.`);
     } else {
       toast.success(`${updated.name} was updated`);
@@ -165,7 +164,7 @@ export function UserDetailPage() {
               userId={target.id}
               currentEmail={target.email}
               pendingEmail={target.pendingEmail}
-              initialCooldown={codeCooldown}
+              resendAfterSeconds={target.emailChangeResendAfter ?? 0}
             />
           )}
           {/* Remount on server-side updates so the form baseline matches the saved user. */}

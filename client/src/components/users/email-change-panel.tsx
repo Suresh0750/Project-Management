@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useCountdown } from '@/hooks/use-countdown';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
@@ -15,8 +16,8 @@ interface EmailChangePanelProps {
   userId: string;
   currentEmail: string;
   pendingEmail: string;
-  /** Seconds before another code may be requested, when a code was just sent. */
-  initialCooldown?: number;
+  /** Seconds the server says are left before another code may be requested. */
+  resendAfterSeconds?: number;
 }
 
 /**
@@ -27,7 +28,7 @@ export function EmailChangePanel({
   userId,
   currentEmail,
   pendingEmail,
-  initialCooldown = 0,
+  resendAfterSeconds = 0,
 }: EmailChangePanelProps) {
   const toast = useToast();
   const confirm = useConfirmEmailChange(userId);
@@ -36,13 +37,12 @@ export function EmailChangePanel({
 
   const [otp, setOtp] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [cooldown, setCooldown] = useState(initialCooldown);
-
+  // The deadline is saved per user, so a refresh carries on from the real time left. The server's
+  // figure (from when the code was actually sent) keeps it right on other devices too.
+  const { remaining: cooldown, start: startCooldown } = useCountdown(`emailchange:${userId}`);
   useEffect(() => {
-    if (cooldown <= 0) return;
-    const timer = setTimeout(() => setCooldown((seconds) => seconds - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [cooldown]);
+    if (resendAfterSeconds > 0) startCooldown(resendAfterSeconds);
+  }, [resendAfterSeconds, startCooldown]);
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -62,7 +62,7 @@ export function EmailChangePanel({
     setError(null);
     resend.mutate(undefined, {
       onSuccess: (result) => {
-        setCooldown(result.resendAfterSeconds);
+        startCooldown(result.resendAfterSeconds);
         toast.success(`A new code was sent to ${result.newEmail}`);
       },
       onError: (err) => setError(err.message),
