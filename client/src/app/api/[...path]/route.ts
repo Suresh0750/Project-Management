@@ -1,17 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-/**
- * Same-origin gateway to the API. The browser only ever talks to this app (`/api/...`); this
- * handler forwards each request to the real API on the server side.
- *
- * Why: the login tokens live in HttpOnly cookies, which page scripts cannot read, so nothing
- * sensitive sits in localStorage. Because the browser now sees one site, those cookies work in a
- * private window and when the app and the API are on different domains. Here, on the server,
- * the access token is read from its cookie and sent to the API as `Authorization: Bearer <token>`.
- *
- * The API address comes from the server-only `API_URL` setting (origin only, no path).
- */
-
 const ACCESS_TOKEN_COOKIE = 'access_token';
 const TIMEOUT_MS = 20_000;
 
