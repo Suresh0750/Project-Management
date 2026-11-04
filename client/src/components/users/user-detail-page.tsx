@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { DeactivateUserDialog } from '@/components/users/deactivate-user-dialog';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast-provider';
@@ -88,11 +88,18 @@ export function UserDetailPage() {
     }
   };
 
-  const setActive = (isActive: boolean) => {
+  const setActive = (isActive: boolean, holdProjects = false) => {
     updateStatus.mutate(
-      { id: target.id, isActive },
+      { id: target.id, isActive, holdProjects },
       {
-        onSuccess: () => toast.success(`User ${isActive ? 'activated' : 'deactivated'}`),
+        onSuccess: ({ heldProjects }) =>
+          toast.success(
+            `User ${isActive ? 'activated' : 'deactivated'}${
+              heldProjects > 0
+                ? `, ${heldProjects} ${heldProjects === 1 ? 'project' : 'projects'} put on hold`
+                : ''
+            }`,
+          ),
         onError: (error) => toast.error(error.message),
         onSettled: () => setConfirmDeactivate(false),
       },
@@ -195,15 +202,11 @@ export function UserDetailPage() {
         )}
       </div>
 
-      <ConfirmDialog
-        open={confirmDeactivate}
-        title="Deactivate user?"
-        description={`${target.name} will be signed out and unable to log in until reactivated.`}
-        confirmLabel="Deactivate"
-        tone="danger"
+      <DeactivateUserDialog
+        user={confirmDeactivate ? { id: target.id, name: target.name, role: target.role } : null}
         loading={updateStatus.isPending}
         onCancel={() => setConfirmDeactivate(false)}
-        onConfirm={() => setActive(false)}
+        onConfirm={(holdProjects) => setActive(false, holdProjects)}
       />
     </div>
   );

@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
-import { Role, type Prisma } from '@prisma/client';
+import { ProjectStatus, Role, type Prisma } from '@prisma/client';
+import { Outbox } from '../../realtime/outbox.js';
+import { recordActivity } from '../activity/activity.service.js';
 import { prisma } from '../../../prisma/client.js';
 import { env } from '../../config/env.js';
 import { disconnectUserSockets } from '../../realtime/socket.js';
@@ -338,8 +340,16 @@ export async function cancelEmailChange(id: string): Promise<void> {
 }
 
 // ─── Update user status (activate / deactivate) ───────────────────────────────
-export async function updateUserStatus(id: string, isActive: boolean, requesterId: string) {
-  const before = await prisma.user.findUnique({ where: { id }, select: { isActive: true } });
+export async function updateUserStatus(
+  id: string,
+  isActive: boolean,
+  requesterId: string,
+  options: { holdProjects?: boolean; requesterName?: string } = {},
+) {
+  const before = await prisma.user.findUnique({
+    where: { id },
+    select: { isActive: true, role: true },
+  });
   if (!before) throw new HttpError(404, 'User not found');
 
   // Prevent self-deactivation
@@ -347,11 +357,48 @@ export async function updateUserStatus(id: string, isActive: boolean, requesterI
     throw new HttpError(400, 'You cannot deactivate your own account');
   }
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: { isActive },
-    select: SAFE_USER_SELECT,
+  // Optionally put the projects this Project Manager runs on hold, in the same transaction as the
+  // deactivation. Finished (completed) and archived projects, and ones already on hold, are left alone.
+  const holdProjects =
+    options.holdProjects === true &&
+    !isActive &&
+    before.isActive &&
+    before.role === Role.PROJECT_MANAGER;
+  const outbox = new Outbox();
+  let heldProjects = 0;
+
+  const user = await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id },
+      data: { isActive },
+      select: SAFE_USER_SELECT,
+    });
+
+    if (holdProjects) {
+      const projects = await tx.project.findMany({
+        where: {
+          managerId: id,
+          archivedAt: null,
+          status: { in: [ProjectStatus.PLANNING, ProjectStatus.ACTIVE] },
+        },
+        select: { id: true, name: true },
+      });
+      for (const project of projects) {
+        await tx.project.update({ where: { id: project.id }, data: { status: ProjectStatus.ON_HOLD } });
+        await recordActivity(tx, {
+          action: 'PROJECT_UPDATED',
+          message: `${options.requesterName ?? 'An administrator'} put "${project.name}" on hold because its Project Manager ${updated.name} was deactivated`,
+          actorId: requesterId,
+          projectId: project.id,
+          metadata: { fields: ['status'], status: ProjectStatus.ON_HOLD },
+        });
+        outbox.addProjectEvent(project.id, 'project:updated');
+      }
+      heldProjects = projects.length;
+    }
+    return updated;
   });
+  outbox.flush();
 
   if (before.isActive !== isActive) {
     // Open tabs and devices learn about it immediately instead of on their next click.
@@ -375,7 +422,7 @@ export async function updateUserStatus(id: string, isActive: boolean, requesterI
     });
   }
 
-  return user;
+  return { user, heldProjects };
 }
 
 // ─── Internal helper ──────────────────────────────────────────────────────────

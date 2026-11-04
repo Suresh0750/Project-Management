@@ -55,6 +55,8 @@ export const updateUserStatusSchema = z.object({
   params: idParamSchema,
   body: z.object({
     isActive: z.boolean({ message: 'isActive must be a boolean' }),
+    // Deactivating a Project Manager: also put the projects they manage on hold.
+    holdProjects: z.boolean({ message: 'holdProjects must be a boolean' }).optional(),
   }),
 });
 

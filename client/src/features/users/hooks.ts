@@ -20,6 +20,7 @@ import {
   type ListUsersParams,
   type UpdateUserPayload,
   type UpdateUserResult,
+  type UpdateUserStatusResult,
 } from '@/features/users/api';
 import type { ApiError } from '@/lib/api/errors';
 import type { AuthUser } from '@/types/auth';
@@ -39,10 +40,11 @@ export function useUsers(params: ListUsersParams, enabled = true) {
   });
 }
 
-export function useUser(id: string) {
+export function useUser(id: string, enabled = true) {
   return useQuery<AuthUser, ApiError>({
     queryKey: usersKeys.detail(id),
     queryFn: ({ signal }) => getUser(id, signal),
+    enabled: enabled && Boolean(id),
   });
 }
 
@@ -93,8 +95,17 @@ export function useCancelEmailChange(id: string) {
 
 export function useUpdateUserStatus() {
   const queryClient = useQueryClient();
-  return useMutation<AuthUser, ApiError, { id: string; isActive: boolean }>({
-    mutationFn: ({ id, isActive }) => updateUserStatus(id, isActive),
-    onSuccess: (user) => syncUser(queryClient, user),
+  return useMutation<
+    UpdateUserStatusResult,
+    ApiError,
+    { id: string; isActive: boolean; holdProjects?: boolean }
+  >({
+    mutationFn: ({ id, isActive, holdProjects }) => updateUserStatus(id, isActive, holdProjects),
+    onSuccess: ({ user, heldProjects }) => {
+      syncUser(queryClient, user);
+      // The manager's detail lists their projects; and held projects changed status.
+      void queryClient.invalidateQueries({ queryKey: usersKeys.detail(user.id) });
+      if (heldProjects > 0) void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
   });
 }

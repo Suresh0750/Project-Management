@@ -105,9 +105,16 @@ export async function updateUserStatus(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { isActive } = req.body as UpdateUserStatusInput;
-    const user = await usersService.updateUserStatus(req.params.id as string, isActive, req.user!.id);
-    res.status(200).json(success({ user }, `User ${isActive ? 'activated' : 'deactivated'} successfully`));
+    const { isActive, holdProjects } = req.body as UpdateUserStatusInput;
+    const { user, heldProjects } = await usersService.updateUserStatus(
+      req.params.id as string,
+      isActive,
+      req.user!.id,
+      { ...(holdProjects !== undefined ? { holdProjects } : {}), requesterName: req.user!.name },
+    );
+    res
+      .status(200)
+      .json(success({ user, heldProjects }, `User ${isActive ? 'activated' : 'deactivated'} successfully`));
   } catch (err) {
     next(err);
   }
