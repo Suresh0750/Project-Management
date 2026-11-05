@@ -114,11 +114,20 @@ export async function deleteTask(id: string): Promise<void> {
   await apiClient.delete(taskPath(id));
 }
 
-export async function listComments(id: string, signal?: AbortSignal): Promise<TaskComment[]> {
+/** Comments and the timeline load newest-first, one page at a time. */
+export const FEED_PAGE_SIZE = 10;
+
+export async function listComments(
+  id: string,
+  page: number,
+  signal?: AbortSignal,
+): Promise<Paginated<TaskComment>> {
   const { data } = await apiClient.get<ApiSuccess<TaskComment[]>>(`${taskPath(id)}/comments`, {
+    params: { page, limit: FEED_PAGE_SIZE },
     signal,
   });
-  return data.data;
+  if (!isPaginationMeta(data.meta)) throw new Error('Unexpected response from the server');
+  return { items: data.data, meta: data.meta };
 }
 
 export async function addComment(id: string, content: string): Promise<TaskComment> {
@@ -129,9 +138,15 @@ export async function addComment(id: string, content: string): Promise<TaskComme
   return data.data.comment;
 }
 
-export async function listTaskActivities(id: string, signal?: AbortSignal): Promise<TaskActivity[]> {
+export async function listTaskActivities(
+  id: string,
+  page: number,
+  signal?: AbortSignal,
+): Promise<Paginated<TaskActivity>> {
   const { data } = await apiClient.get<ApiSuccess<TaskActivity[]>>(`${taskPath(id)}/activities`, {
+    params: { page, limit: FEED_PAGE_SIZE },
     signal,
   });
-  return data.data;
+  if (!isPaginationMeta(data.meta)) throw new Error('Unexpected response from the server');
+  return { items: data.data, meta: data.meta };
 }

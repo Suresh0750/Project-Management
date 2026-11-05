@@ -93,6 +93,15 @@ export const assignTaskSchema = z.object({
 
 export const taskIdParamSchema = z.object({ params: z.object({ id: idSchema }) });
 
+// Comments and the activity timeline load a page at a time (newest first) as the reader scrolls.
+export const taskFeedSchema = z.object({
+  params: z.object({ id: idSchema }),
+  query: z.object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(10),
+  }),
+});
+
 export const addCommentSchema = z.object({
   params: z.object({ id: idSchema }),
   body: z.object({
@@ -105,6 +114,7 @@ export const addCommentSchema = z.object({
   }),
 });
 
+export type TaskFeedQuery = z.infer<typeof taskFeedSchema>['query'];
 export type ListTasksQuery = z.infer<typeof listTasksSchema>['query'];
 export type CreateTaskInput = z.infer<typeof createTaskSchema>['body'];
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>['body'];

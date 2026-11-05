@@ -125,6 +125,15 @@ body {
   }
 }
 
+/* Scrollable areas that should look clean: still scrolls with wheel, touch and keyboard. */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /*
  * Dropdown lists. The open list of a normal <select> is drawn by the browser, which ignores the
  * cursor, colours and spacing set here. Where the browser supports customisable selects

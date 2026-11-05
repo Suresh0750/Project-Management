@@ -9,6 +9,7 @@ import {
   assignTaskSchema,
   createTaskSchema,
   listTasksSchema,
+  taskFeedSchema,
   taskIdParamSchema,
   updateTaskSchema,
   updateTaskStatusSchema,
@@ -31,8 +32,8 @@ router.patch('/:id/status', validate(updateTaskStatusSchema), controller.updateT
 router.patch('/:id/assign', manage, validate(assignTaskSchema), controller.assignTask);
 router.delete('/:id', manage, validate(taskIdParamSchema), controller.deleteTask);
 
-router.get('/:id/comments', validate(taskIdParamSchema), controller.listComments);
+router.get('/:id/comments', validate(taskFeedSchema), controller.listComments);
 router.post('/:id/comments', validate(addCommentSchema), controller.addComment);
-router.get('/:id/activities', validate(taskIdParamSchema), controller.listTaskActivities);
+router.get('/:id/activities', validate(taskFeedSchema), controller.listTaskActivities);
 
 export default router;

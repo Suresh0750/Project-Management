@@ -9,6 +9,7 @@ import { manages, permissionsFor, taskScope } from './tasks.access.js';
 import type {
   CreateTaskInput,
   ListTasksQuery,
+  TaskFeedQuery,
   UpdateTaskInput,
   UpdateTaskStatusInput,
 } from './tasks.validation.js';
@@ -408,14 +409,24 @@ const commentSelect = {
   author: { select: { id: true, name: true } },
 } satisfies Prisma.CommentSelect;
 
-export async function listComments(user: AuthUser, taskId: string) {
+function feedMeta(total: number, query: TaskFeedQuery) {
+  return { total, page: query.page, limit: query.limit, totalPages: Math.ceil(total / query.limit) };
+}
+
+/** Newest first, one page at a time. `id` breaks ties so pages never overlap or skip rows. */
+export async function listComments(user: AuthUser, taskId: string, query: TaskFeedQuery) {
   await findAccessible(user, taskId);
-  return prisma.comment.findMany({
-    where: { taskId },
-    orderBy: { createdAt: 'asc' },
-    take: 200,
-    select: commentSelect,
-  });
+  const [comments, total] = await prisma.$transaction([
+    prisma.comment.findMany({
+      where: { taskId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      select: commentSelect,
+    }),
+    prisma.comment.count({ where: { taskId } }),
+  ]);
+  return { comments, meta: feedMeta(total, query) };
 }
 
 export async function addComment(user: AuthUser, taskId: string, content: string) {
@@ -450,19 +461,24 @@ export async function addComment(user: AuthUser, taskId: string, content: string
 }
 
 // ─── Activity timeline (chronological, immutable) ─────────────────────────────
-export async function listTaskActivities(user: AuthUser, taskId: string) {
+export async function listTaskActivities(user: AuthUser, taskId: string, query: TaskFeedQuery) {
   await findAccessible(user, taskId);
-  return prisma.activity.findMany({
-    where: { taskId },
-    orderBy: { createdAt: 'asc' },
-    take: 200,
-    select: {
-      id: true,
-      action: true,
-      message: true,
-      metadata: true,
-      createdAt: true,
-      actor: { select: { id: true, name: true } },
-    },
-  });
+  const [activities, total] = await prisma.$transaction([
+    prisma.activity.findMany({
+      where: { taskId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      select: {
+        id: true,
+        action: true,
+        message: true,
+        metadata: true,
+        createdAt: true,
+        actor: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.activity.count({ where: { taskId } }),
+  ]);
+  return { activities, meta: feedMeta(total, query) };
 }
