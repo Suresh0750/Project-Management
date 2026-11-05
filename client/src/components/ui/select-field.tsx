@@ -42,7 +42,7 @@ export function SelectField({
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
           className={cn(
-            'h-10 w-full appearance-none rounded-lg border bg-surface pl-3 pr-9 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60',
+            'pf-select h-10 w-full appearance-none rounded-lg border bg-surface pl-3 pr-9 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60',
             error ? 'border-danger' : 'border-border-strong',
             className,
           )}
