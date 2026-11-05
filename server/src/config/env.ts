@@ -41,6 +41,10 @@ const envSchema = z.object({
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(10).max(600).default(60),
   OTP_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),
 
+  // Error log files (errors only). Relative paths are resolved from the server folder.
+  LOG_DIR: z.string().trim().min(1).default('logs'),
+  LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+
   // Rate limiting is always on in production. Elsewhere it is off unless this is "true".
   RATE_LIMIT_ENABLED: z
     .enum(["true", "false"])

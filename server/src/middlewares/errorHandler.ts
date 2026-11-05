@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { failure } from '../utils/apiResponse.js';
 import { HttpError } from '../utils/httpError.js';
+import { logRequestError } from '../utils/logger.js';
 
 const GENERIC_SERVER_MESSAGE = 'Something went wrong on our side. Please try again later.';
 const UNAVAILABLE_MESSAGE = 'The service is temporarily unavailable. Please try again in a moment.';
@@ -24,10 +25,9 @@ export function errorHandler(
 ): void {
   const publicError = toPublicError(err);
 
-  // Only unexpected failures are logged; full details stay on the server.
-  if (publicError.status >= 500) {
-    console.error(`[${req.requestId}] ${req.method} ${req.originalUrl} -> ${publicError.status}`, err);
-  }
+  // Only unexpected failures (5xx) are logged. Wrong passwords, validation errors, 404s and the
+  // like are normal and stay out of the log. Full details stay on the server.
+  if (publicError.status >= 500) logRequestError(req, publicError.status, err);
 
   if (res.headersSent) return;
   res.status(publicError.status).json(failure(publicError.message, publicError.errors ?? []));

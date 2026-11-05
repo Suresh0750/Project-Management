@@ -88,7 +88,7 @@ export function NotificationDropdown({ role }: { role: Role }) {
     );
   } else {
     body = (
-      <ul className="max-h-96 divide-y divide-border overflow-y-auto">
+      <ul className="[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden max-h-96 divide-y divide-border overflow-y-auto">
         {notifications.data.items.map((notification) => (
           <li key={notification.id}>
             <NotificationItem notification={notification} role={role} onOpen={handleOpen} />

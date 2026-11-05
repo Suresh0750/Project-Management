@@ -1,4 +1,3 @@
-import { clearTokens } from '@/lib/auth/token-store';
 import { disconnectSocket } from '@/lib/socket/client';
 
 export type SessionEndReason = 'deactivated' | 'role-changed';
@@ -31,7 +30,6 @@ export function endSession(reason: SessionEndReason): void {
 
   ended = true;
   endedBecause = reason;
-  clearTokens();
   disconnectSocket();
   window.location.replace(target);
 }

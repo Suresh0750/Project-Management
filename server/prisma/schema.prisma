@@ -47,6 +47,12 @@ enum ActivityAction {
   COMMENT_ADDED
 }
 
+enum OtpPurpose {
+  SIGNUP
+  EMAIL_CHANGE
+  PASSWORD_RESET
+}
+
 enum NotificationType {
   TASK_ASSIGNED
   TASK_STATUS_CHANGED
@@ -71,8 +77,7 @@ model User {
 
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
-  emailVerification EmailVerification?
-  passwordReset     PasswordReset?
+  otpCodes          OtpCode[]
   sessions          Session[]
 
   createdProjects Project[]       @relation("ProjectCreator")
@@ -93,33 +98,23 @@ model User {
   @@index([isActive])
 }
 
-// EMAIL VERIFICATION (one active one-time code per user)
-model EmailVerification {
-  id        String   @id @default(cuid())
-  userId    String   @unique
+// ONE-TIME CODES (sign-up, admin email change, password reset): one table, one verify function.
+// A user has at most one live code per purpose; asking for another replaces it.
+model OtpCode {
+  id        String     @id @default(cuid())
+  userId    String
+  purpose   OtpPurpose
   // HMAC of the 6-digit code; the code itself is never stored.
   codeHash  String
-  // null: confirms a new account. Set: confirms this address as the user's NEW email (admin edit).
-  newEmail  String?  @db.VarChar(254)
+  // EMAIL_CHANGE only: the address the code was sent to and that will replace the current one.
+  newEmail  String?    @db.VarChar(254)
   expiresAt DateTime
-  attempts  Int      @default(0)
-  sentAt    DateTime @default(now())
+  attempts  Int        @default(0)
+  sentAt    DateTime   @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
 
-// PASSWORD RESET (one active one-time code per user; kept apart from EmailVerification so the
-// two flows can never consume each other's code)
-model PasswordReset {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  // HMAC of the 6-digit code; the code itself is never stored.
-  codeHash  String
-  expiresAt DateTime
-  attempts  Int      @default(0)
-  sentAt    DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, purpose])
 }
 
 // One row per signed-in browser/device. Both JWTs carry its id (`sid`); deleting the row ends

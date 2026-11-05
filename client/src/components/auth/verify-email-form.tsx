@@ -49,7 +49,14 @@ export function VerifyEmailForm() {
   const typedEmail = useWatch({ control, name: 'email' });
   const { remaining, start } = useCountdown(`verify:${(typedEmail ?? '').trim().toLowerCase()}`);
 
-  useEffect(() => () => reset({ email: '', otp: '' }), [reset]);
+  // Keep the address from the link in the form (also if the page is reused for another link).
+  useEffect(() => {
+    if (initialEmail) setValue('email', initialEmail);
+  }, [initialEmail, setValue]);
+
+  // Discard the typed code when the page goes away. The address from the link is kept: resetting
+  // it to blank (which also runs once in development, when React tests the cleanup) emptied it.
+  useEffect(() => () => reset({ email: initialEmail, otp: '' }), [reset, initialEmail]);
 
   const submit = handleSubmit((values) => {
     setFormError(null);
@@ -60,6 +67,11 @@ export function VerifyEmailForm() {
       },
       onError: (raw) => {
         const error = asApiError(raw);
+        // Verified elsewhere in the meantime (another browser or device): nothing left to do here.
+        if (error.fieldErrors.code === 'EMAIL_ALREADY_VERIFIED') {
+          router.replace('/login?reason=verified');
+          return;
+        }
         const otpMessage = error.fieldErrors.otp;
         if (otpMessage) {
           setError('otp', { message: otpMessage });

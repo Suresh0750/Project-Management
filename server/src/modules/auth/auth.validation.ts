@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { passwordSchema } from '../../utils/passwordPolicy.js';
-import { lineString } from '../../utils/text.js';
+import { capitalizeWords, lineString } from '../../utils/text.js';
 
 export const registerSchema = z.object({
   body: z.object({
-    name: lineString().pipe(z.string().min(2, 'Name must be at least 2 characters').max(100)),
+    name: lineString()
+      .pipe(z.string().min(2, 'Name must be at least 2 characters').max(100))
+      .transform(capitalizeWords),
     email: z.string().trim().toLowerCase().email('Invalid email address'),
     password: passwordSchema,
   }),

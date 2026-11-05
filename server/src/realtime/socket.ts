@@ -1,3 +1,4 @@
+import { logError } from '../utils/logger.js';
 import type { Server as HttpServer } from 'node:http';
 import { Role } from '@prisma/client';
 import { Server, type Socket } from 'socket.io';
@@ -133,7 +134,7 @@ export function initSocket(httpServer: HttpServer): Server {
   });
   io.on('connection', (socket) => {
     onConnection(socket).catch((error: unknown) => {
-      console.error('Socket connection setup failed', error);
+      logError('Socket connection setup failed', error);
       socket.disconnect(true);
     });
   });

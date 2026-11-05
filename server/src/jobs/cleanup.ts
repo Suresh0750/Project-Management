@@ -1,3 +1,4 @@
+import { logError } from '../utils/logger.js';
 import { prisma } from '../../prisma/client.js';
 import { deleteExpiredSessions } from '../modules/auth/session.service.js';
 
@@ -8,7 +9,7 @@ const CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
  * when used; this only stops rows from piling up for people who never came back.
  */
 export async function deleteExpiredOtps(now: Date = new Date()): Promise<number> {
-  const result = await prisma.emailVerification.deleteMany({ where: { expiresAt: { lt: now } } });
+  const result = await prisma.otpCode.deleteMany({ where: { expiresAt: { lt: now } } });
   return result.count;
 }
 
@@ -16,12 +17,11 @@ async function runCleanup(): Promise<void> {
   try {
     const removed = await deleteExpiredOtps();
     if (removed > 0) console.info(`[cleanup] removed ${removed} expired verification code(s)`);
-    await prisma.passwordReset.deleteMany({ where: { expiresAt: { lt: new Date() } } });
     const sessions = await deleteExpiredSessions();
     if (sessions > 0) console.info(`[cleanup] removed ${sessions} expired session(s)`);
   } catch (error) {
     // A failed sweep must never take the API down; the next one will retry.
-    console.error('[cleanup] failed to remove expired verification codes', error);
+    logError('Cleanup job failed to remove expired codes or sessions', error);
   }
 }
 
