@@ -4,12 +4,20 @@ import type { ApiErrorBody } from '@/lib/api/types';
 export class ApiError extends Error {
   readonly status: number | null;
   readonly fieldErrors: Record<string, string>;
+  /** The request id of the failed call (the same id is in the server's error log), if known. */
+  readonly requestId: string | null;
 
-  constructor(message: string, status: number | null, fieldErrors: Record<string, string> = {}) {
+  constructor(
+    message: string,
+    status: number | null,
+    fieldErrors: Record<string, string> = {},
+    requestId: string | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.fieldErrors = fieldErrors;
+    this.requestId = requestId;
   }
 
   get isNetworkError(): boolean {
@@ -77,9 +85,20 @@ export function toApiError(error: unknown): ApiError {
       return new ApiError(timedOut ? TIMEOUT_MESSAGE : NETWORK_MESSAGE, null);
     }
 
-    const { status, data } = error.response;
+    const { status, data, headers } = error.response;
     const body = typeof data === 'object' && data !== null ? data : undefined;
-    return new ApiError(pickMessage(status, body?.message), status, extractFieldErrors(body?.errors));
+    const rawId: unknown = headers?.['x-request-id'];
+    const requestId = typeof rawId === 'string' && rawId.length > 0 ? rawId : null;
+
+    // For a server failure (5xx) show a short reference. The person can quote it, and support can
+    // search the log for it (the log holds the full id).
+    const reference = status >= 500 && requestId ? ` (Ref: ${requestId.slice(0, 8)})` : '';
+    return new ApiError(
+      `${pickMessage(status, body?.message)}${reference}`,
+      status,
+      extractFieldErrors(body?.errors),
+      requestId,
+    );
   }
 
   return new ApiError(SERVER_MESSAGE, null);

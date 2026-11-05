@@ -39,7 +39,7 @@ export function FilterDropdown({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           {...(visibleLabel ? {} : { 'aria-label': label })}
-          className="h-10 w-full appearance-none rounded-lg border border-border-strong bg-surface pl-3 pr-9 text-sm"
+          className="pf-select h-10 w-full appearance-none rounded-lg border border-border-strong bg-surface pl-3 pr-9 text-sm"
         >
           {!hideAll && <option value="">{allLabel}</option>}
           {options.map((option) => (

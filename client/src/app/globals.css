@@ -110,6 +110,7 @@ body {
   button:not(:disabled),
   [role='button']:not([aria-disabled='true']),
   select:not(:disabled),
+  select:not(:disabled) option,
   summary,
   input[type='checkbox']:not(:disabled),
   input[type='radio']:not(:disabled),
@@ -121,5 +122,54 @@ body {
   select:disabled,
   [aria-disabled='true'] {
     cursor: not-allowed;
+  }
+}
+
+/*
+ * Dropdown lists. The open list of a normal <select> is drawn by the browser, which ignores the
+ * cursor, colours and spacing set here. Where the browser supports customisable selects
+ * (Chrome and Edge 135+), opt in so the options can be styled: pointer cursor, app colours,
+ * hover and selected states. Other browsers keep their normal dropdown, which still works.
+ */
+@supports (appearance: base-select) {
+  .pf-select,
+  .pf-select::picker(select) {
+    appearance: base-select;
+  }
+
+  /* The app draws its own chevron next to the select. */
+  .pf-select::picker-icon {
+    display: none;
+  }
+
+  .pf-select::picker(select) {
+    margin-top: 4px;
+    padding: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.5rem;
+    background: var(--surface);
+    color: var(--foreground);
+    box-shadow: 0 10px 25px rgb(0 0 0 / 0.15);
+  }
+
+  .pf-select option {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+  }
+
+  .pf-select option:hover,
+  .pf-select option:focus-visible {
+    background: var(--surface-muted);
+  }
+
+  .pf-select option:checked {
+    background: var(--info-soft);
+    font-weight: 600;
+  }
+
+  .pf-select option::checkmark {
+    display: none;
   }
 }

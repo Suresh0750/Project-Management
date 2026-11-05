@@ -4,7 +4,7 @@ import './config/env.js';
 import { createApp } from './app.js';
 import { startCleanupJobs } from './jobs/cleanup.js';
 import { closeSocket, initSocket } from './realtime/socket.js';
-import { flushLogs, logError, startLogMaintenance } from './utils/logger.js';
+import { flushLogs, initLogs, logError, startLogMaintenance } from './utils/logger.js';
 
 const app = createApp();
 
@@ -20,6 +20,9 @@ const httpServer = app.listen(PORT, () => {
   );
   stopCleanup = startCleanupJobs();
   stopLogMaintenance = startLogMaintenance();
+  initLogs()
+    .then((file) => console.info(`Error log file: ${file}`))
+    .catch((error: unknown) => console.error('Cannot create the error log file', error));
 });
 
 // Socket.IO attaches to that same server, so REST and WebSocket share one port.
