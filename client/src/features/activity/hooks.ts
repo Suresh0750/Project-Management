@@ -1,22 +1,18 @@
 'use client';
 
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { listActivities, type ListActivitiesParams } from '@/features/activity/api';
 
-export type ActivityFeedParams = Omit<ListActivitiesParams, 'page'>;
-
 export const activityKeys = {
-  feed: (params: ActivityFeedParams) => ['activities', 'feed', params] as const,
+  list: (params: ListActivitiesParams) => ['activities', 'list', params] as const,
 };
 
-/** Newest-first feed that loads one page at a time as the reader scrolls. */
-export function useActivityFeed(params: ActivityFeedParams, enabled = true) {
-  return useInfiniteQuery({
-    queryKey: activityKeys.feed(params),
-    queryFn: ({ pageParam, signal }) => listActivities({ ...params, page: pageParam }, signal),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) =>
-      lastPage.meta.page < lastPage.meta.totalPages ? lastPage.meta.page + 1 : undefined,
+/** One page of the newest-first activity history; the previous page stays on screen while the next loads. */
+export function useActivities(params: ListActivitiesParams, enabled = true) {
+  return useQuery({
+    queryKey: activityKeys.list(params),
+    queryFn: ({ signal }) => listActivities(params, signal),
+    placeholderData: keepPreviousData,
     enabled,
   });
 }
