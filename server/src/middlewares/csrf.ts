@@ -20,10 +20,14 @@ export function csrfProtection(req: Request, _res: Response, next: NextFunction)
   }
 
   const origin = req.header('origin') ?? originFromReferer(req.header('referer'));
-  if (origin !== new URL(env.CLIENT_URL).origin) {
-    next(new HttpError(403, 'Cross-site request blocked'));
-    return;
-  }
+  const trustedOrigins = [
+  new URL(env.CLIENT_URL).origin,
+  new URL(env.SWAGGER_SERVER_URL!).origin,
+  ];
+  if (!origin || !trustedOrigins.includes(origin)) {
+  next(new HttpError(403, 'Cross-site request blocked'));
+  return;
+}
 
   next();
 }

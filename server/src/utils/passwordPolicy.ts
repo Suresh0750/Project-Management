@@ -1,10 +1,5 @@
 import { z } from 'zod';
 
-/**
- * The one password policy for every place a password is chosen (register, change password,
- * admin creating a user). Keep in step with PASSWORD_RULES in client/src/schemas/auth.ts.
- * Passwords are never trimmed: spaces are allowed as part of a password.
- */
 export const passwordSchema = z
   .string()
   .min(8, 'Password must be at least 8 characters')
