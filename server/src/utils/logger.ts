@@ -4,17 +4,6 @@ import type { Request } from 'express';
 import { env } from '../config/env.js';
 import { currentRequest } from './requestContext.js';
 
-/**
- * Error-only logger. Nothing but errors is recorded: no request logging, no info, no debug.
- *
- * Each error becomes one JSON line in `<LOG_DIR>/error-YYYY-MM-DD.log` and a short line on the
- * console. Every entry carries the request id (also returned to the client in the `x-request-id`
- * header), so a report like "it failed at 10:32" can be traced to the exact error.
- *
- * Files rotate by day and by size, and files older than LOG_RETENTION_DAYS are deleted.
- * Request bodies, headers, cookies and anything that looks like a token or password are never
- * written; see `redact`.
- */
 
 const LOG_DIR = path.resolve(env.LOG_DIR);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -81,13 +70,17 @@ async function fileFor(date: Date): Promise<string> {
 }
 
 function writeLine(line: string): void {
-  // One queue keeps lines in order and never lets a failed write break the app: the error was
-  // already printed to the console, which is the fallback.
   writes = writes
     .then(async () => appendFile(await fileFor(new Date()), `${line}\n`, 'utf8'))
     .catch((failure: unknown) => {
       console.error('[logger] could not write the log file', failure);
     });
+}
+
+export async function initLogs(): Promise<string> {
+  const file = await fileFor(new Date());
+  await appendFile(file, '', 'utf8');
+  return file;
 }
 
 /** Resolves once every queued line is on disk (call before the process exits). */
