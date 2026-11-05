@@ -45,6 +45,20 @@ const envSchema = z.object({
   LOG_DIR: z.string().trim().min(1).default('logs'),
   LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
 
+  // API documentation (Swagger UI at /api-docs, JSON at /api-docs.json).
+  // SWAGGER_SERVER_URL: the public address of this API, origin only (e.g. https://api.example.com).
+  // Defaults to http://localhost:<PORT>. SWAGGER_ENABLED=false turns the documentation pages off.
+  SWAGGER_SERVER_URL: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value.replace(/\/+$/, '') : undefined))
+    .pipe(z.string().url('SWAGGER_SERVER_URL must be a valid URL').optional()),
+  SWAGGER_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+
   // Rate limiting is always on in production. Elsewhere it is off unless this is "true".
   RATE_LIMIT_ENABLED: z
     .enum(["true", "false"])

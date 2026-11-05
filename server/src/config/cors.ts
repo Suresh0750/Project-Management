@@ -2,7 +2,7 @@ import type { CorsOptions } from 'cors';
 import { env } from './env.js';
 import { HttpError } from '../utils/httpError.js';
 
-const allowedOrigins = [env.CLIENT_URL];
+const allowedOrigins = [env.CLIENT_URL,env.SWAGGER_SERVER_URL];
 
 export const corsOptions: CorsOptions = {
   origin(origin, callback) {
