@@ -2,6 +2,7 @@
 
 import {
   keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -24,6 +25,7 @@ import {
 } from '@/features/tasks/api';
 import { projectsKeys } from '@/features/projects/hooks';
 import type { ApiError } from '@/lib/api/errors';
+import type { Paginated } from '@/lib/api/types';
 import type { Task, TaskComment, TaskStatus } from '@/types/task';
 
 export const tasksKeys = {
@@ -50,18 +52,39 @@ export function useTask(id: string) {
   });
 }
 
+const nextFeedPage = (last: Paginated<unknown>) =>
+  last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined;
+
+/** Newest-first comments, one page at a time as the reader scrolls. */
 export function useTaskComments(id: string) {
-  return useQuery<TaskComment[], ApiError>({
+  return useInfiniteQuery({
     queryKey: tasksKeys.comments(id),
-    queryFn: ({ signal }) => listComments(id, signal),
+    queryFn: ({ pageParam, signal }) => listComments(id, pageParam, signal),
+    initialPageParam: 1,
+    getNextPageParam: nextFeedPage,
   });
 }
 
+/** Newest-first task timeline, one page at a time as the reader scrolls. */
 export function useTaskActivities(id: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: tasksKeys.activities(id),
-    queryFn: ({ signal }) => listTaskActivities(id, signal),
+    queryFn: ({ pageParam, signal }) => listTaskActivities(id, pageParam, signal),
+    initialPageParam: 1,
+    getNextPageParam: nextFeedPage,
   });
+}
+
+/**
+ * Joins the loaded pages. A new entry shifts later pages by one, so the same row can arrive
+ * twice; keep the first copy.
+ */
+export function flattenFeed<T extends { id: string }>(pages: Array<Paginated<T>> | undefined): T[] {
+  const seen = new Map<string, T>();
+  for (const page of pages ?? []) {
+    for (const item of page.items) if (!seen.has(item.id)) seen.set(item.id, item);
+  }
+  return [...seen.values()];
 }
 
 /** Refresh the task everywhere it appears: lists, detail, timeline and project progress. */

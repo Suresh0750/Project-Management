@@ -5,6 +5,7 @@ import * as tasksService from './tasks.service.js';
 import type {
   CreateTaskInput,
   ListTasksQuery,
+  TaskFeedQuery,
   UpdateTaskInput,
   UpdateTaskStatusInput,
 } from './tasks.validation.js';
@@ -52,8 +53,8 @@ export const deleteTask = asyncHandler(async (req, res) => {
 });
 
 export const listComments = asyncHandler(async (req, res) => {
-  const comments = await tasksService.listComments(req.user!, idOf(req));
-  res.status(200).json(success(comments, 'Comments fetched successfully'));
+  const result = await tasksService.listComments(req.user!, idOf(req), req.query as unknown as TaskFeedQuery);
+  res.status(200).json(success(result.comments, 'Comments fetched successfully', result.meta));
 });
 
 export const addComment = asyncHandler(async (req, res) => {
@@ -63,6 +64,6 @@ export const addComment = asyncHandler(async (req, res) => {
 });
 
 export const listTaskActivities = asyncHandler(async (req, res) => {
-  const activities = await tasksService.listTaskActivities(req.user!, idOf(req));
-  res.status(200).json(success(activities, 'Activities fetched successfully'));
+  const result = await tasksService.listTaskActivities(req.user!, idOf(req), req.query as unknown as TaskFeedQuery);
+  res.status(200).json(success(result.activities, 'Activities fetched successfully', result.meta));
 });
