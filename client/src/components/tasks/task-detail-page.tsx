@@ -105,12 +105,10 @@ export function TaskDetailPage({ role }: { role: Role }) {
   const handleSave = async (values: TaskFormValues) => {
     const full = toCreateTaskPayload(values);
     const payload: UpdateTaskPayload = {};
-    if (permissions.canEditAllFields) {
-      if (full.title !== data.title) payload.title = full.title;
-      if (full.priority !== data.priority) payload.priority = full.priority;
-      if (full.dueDate !== (data.dueDate ? toDateInputValue(data.dueDate) : null)) {
-        payload.dueDate = full.dueDate;
-      }
+    if (full.title !== data.title) payload.title = full.title;
+    if (full.priority !== data.priority) payload.priority = full.priority;
+    if (full.dueDate !== (data.dueDate ? toDateInputValue(data.dueDate) : null)) {
+      payload.dueDate = full.dueDate;
     }
     if (full.description !== data.description) payload.description = full.description;
 
@@ -198,7 +196,6 @@ export function TaskDetailPage({ role }: { role: Role }) {
               <TaskForm
                 key={data.updatedAt}
                 mode="edit"
-                descriptionOnly={!permissions.canEditAllFields}
                 defaultValues={{
                   title: data.title,
                   description: data.description ?? '',
@@ -227,8 +224,9 @@ export function TaskDetailPage({ role }: { role: Role }) {
         </div>
 
         <aside className="h-fit space-y-5 rounded-xl border border-border bg-surface p-6">
-          {/* Status and assignee can only be changed after pressing Edit; otherwise they are shown as text. */}
-          {editing && permissions.canChangeStatus ? (
+          {/* Managers and admins change status and assignee after pressing Edit. A member has no Edit
+              (they cannot edit a task), so the status of their own task is changeable directly. */}
+          {permissions.canChangeStatus && (editing || !permissions.canEdit) ? (
             <SelectField
               label="Status"
               options={STATUS_OPTIONS}

@@ -30,21 +30,12 @@ const FIELDS = [
 interface TaskFormProps {
   mode: 'create' | 'edit';
   defaultValues?: Partial<TaskFormValues>;
-  /** Assignees of their own tasks may only change the description. */
-  descriptionOnly?: boolean;
   submitLabel: string;
   onSubmit: (values: TaskFormValues) => Promise<void>;
   onCancel?: () => void;
 }
 
-export function TaskForm({
-  mode,
-  defaultValues,
-  descriptionOnly = false,
-  submitLabel,
-  onSubmit,
-  onCancel,
-}: TaskFormProps) {
+export function TaskForm({ mode, defaultValues, submitLabel, onSubmit, onCancel }: TaskFormProps) {
   const isCreate = mode === 'create';
   const today = useToday();
   const [formError, setFormError] = useState<string | null>(null);
@@ -58,7 +49,9 @@ export function TaskForm({
     reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<TaskFormValues>({
-    resolver: zodResolver(taskFormSchema(mode, defaultValues?.dueDate ?? '')) as Resolver<TaskFormValues>,
+    resolver: zodResolver(
+      taskFormSchema(mode, defaultValues?.dueDate ?? ''),
+    ) as Resolver<TaskFormValues>,
     mode: 'onTouched',
     defaultValues: {
       title: '',
@@ -141,9 +134,7 @@ export function TaskForm({
     <form onSubmit={submit} onChange={() => setFormError(null)} noValidate className="space-y-5">
       {formError && <Alert tone="error">{formError}</Alert>}
 
-      {!descriptionOnly && (
-        <TextField label="Title" error={errors.title?.message} {...register('title')} />
-      )}
+      <TextField label="Title" error={errors.title?.message} {...register('title')} />
 
       <TextareaField
         label="Description"
@@ -159,7 +150,9 @@ export function TaskForm({
             placeholder={projects.isPending ? 'Loading projects…' : 'Select a project'}
             options={projectOptions}
             disabled={projects.isPending}
-            error={errors.projectId?.message ?? (projects.isError ? projects.error.message : undefined)}
+            error={
+              errors.projectId?.message ?? (projects.isError ? projects.error.message : undefined)
+            }
             // Controlled: the projects load after the page opens, and a plain <select> would stay on
             // the placeholder even though the preset project (from ?projectId=) is in the form.
             value={projectId}
@@ -175,40 +168,41 @@ export function TaskForm({
                 ? 'This project has no active members yet. Add members to the project to assign tasks.'
                 : 'Only active members of the project can be assigned.'
             }
-            error={errors.assigneeId?.message ?? (project.isError ? project.error.message : undefined)}
+            error={
+              errors.assigneeId?.message ?? (project.isError ? project.error.message : undefined)
+            }
             {...register('assigneeId')}
           />
         </div>
       )}
 
-      {!descriptionOnly && (
-        <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <SelectField
+          label="Priority"
+          options={PRIORITY_OPTIONS}
+          error={errors.priority?.message}
+          {...register('priority')}
+        />
+        {isCreate && (
           <SelectField
-            label="Priority"
-            options={PRIORITY_OPTIONS}
-            error={errors.priority?.message}
-            {...register('priority')}
+            label="Status"
+            options={STATUS_OPTIONS}
+            error={errors.status?.message}
+            {...register('status')}
           />
-          {isCreate && (
-            <SelectField
-              label="Status"
-              options={STATUS_OPTIONS}
-              error={errors.status?.message}
-              {...register('status')}
-            />
-          )}
-          <TextField
-            label="Due date"
-            type="date"
-            min={
-              (defaultValues?.dueDate && defaultValues.dueDate < today ? defaultValues.dueDate : today) ||
-              undefined
-            }
-            error={errors.dueDate?.message}
-            {...register('dueDate')}
-          />
-        </div>
-      )}
+        )}
+        <TextField
+          label="Due date"
+          type="date"
+          min={
+            (defaultValues?.dueDate && defaultValues.dueDate < today
+              ? defaultValues.dueDate
+              : today) || undefined
+          }
+          error={errors.dueDate?.message}
+          {...register('dueDate')}
+        />
+      </div>
 
       <div className="flex justify-end gap-2 pt-2">
         {onCancel && (

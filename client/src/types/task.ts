@@ -23,7 +23,6 @@ export const DUE_FILTER_LABEL: Record<DueFilter, string> = {
 /** Computed by the server for the signed-in user; the server still enforces each action. */
 export interface TaskPermissions {
   canEdit: boolean;
-  canEditAllFields: boolean;
   canAssign: boolean;
   canDelete: boolean;
   canChangeStatus: boolean;

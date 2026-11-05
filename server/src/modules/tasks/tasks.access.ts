@@ -22,9 +22,8 @@ interface PermissionSubject {
 }
 
 export interface TaskPermissions {
-  /** Any edit at all (members: description only). */
+  /** Edit the task's own fields (title, description, priority, due date). Managers and admins only. */
   canEdit: boolean;
-  canEditAllFields: boolean;
   canAssign: boolean;
   canDelete: boolean;
   canChangeStatus: boolean;
@@ -37,7 +36,8 @@ export function manages(user: AuthUser, project: { managerId: string }): boolean
 
 /**
  * Single source of truth for task permissions. Archived projects are read-only for everyone.
- * Members may only work on tasks assigned to them (status + description) and comment.
+ * Members may only change the status of tasks assigned to them, and comment. They cannot edit a
+ * task's fields, including its description.
  */
 export function permissionsFor(user: AuthUser, task: PermissionSubject): TaskPermissions {
   const writable = task.project.archivedAt === null;
@@ -45,8 +45,7 @@ export function permissionsFor(user: AuthUser, task: PermissionSubject): TaskPer
   const isAssignee = writable && user.role === Role.MEMBER && task.assigneeId === user.id;
 
   return {
-    canEdit: canManage || isAssignee,
-    canEditAllFields: canManage,
+    canEdit: canManage,
     canAssign: canManage,
     canDelete: canManage,
     canChangeStatus: canManage || isAssignee,
