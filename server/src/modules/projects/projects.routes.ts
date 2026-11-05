@@ -38,6 +38,9 @@ router.patch('/:id', manage, validate(updateProjectSchema), controller.updatePro
 // PATCH  /api/projects/:id/archive
 router.patch('/:id/archive', manage, validate(archiveProjectSchema), controller.archiveProject);
 
+// GET    /api/projects/:id/open-tasks   (what stops the project from being completed)
+router.get('/:id/open-tasks', manage, validate(projectIdParamSchema), controller.listOpenTasks);
+
 // GET    /api/projects/:id/archive-readiness
 router.get(
   '/:id/archive-readiness',

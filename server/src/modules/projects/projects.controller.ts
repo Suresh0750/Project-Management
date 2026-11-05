@@ -53,6 +53,11 @@ export const archiveProject = handler(async (req, res) => {
     .json(success({ project }, archived ? 'Project archived successfully' : 'Project restored'));
 });
 
+export const listOpenTasks = handler(async (req, res) => {
+  const result = await projectsService.listOpenTasks(req.user!, idOf(req));
+  res.status(200).json(success(result, 'Open tasks fetched successfully'));
+});
+
 export const getArchiveReadiness = handler(async (req, res) => {
   const readiness = await projectsService.getArchiveReadiness(req.user!, idOf(req));
   res.status(200).json(success({ readiness }, 'Archive readiness fetched successfully'));
