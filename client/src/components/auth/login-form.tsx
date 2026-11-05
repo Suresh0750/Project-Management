@@ -32,14 +32,10 @@ export function LoginForm() {
   const nextPath = searchParams.get('next');
   const reason = searchParams.get('reason');
 
-  // The URL already says the session ended (we were just sent here because the account was
-  // deactivated or the session expired), so there is nothing to ask the server. Asking again would
-  // cost a request plus a refresh attempt and flash a skeleton before the form.
-  const sessionKnownEnded =
-    reason === 'deactivated' ||
-    reason === 'expired' ||
-    reason === 'role-changed' ||
-    reason === 'verified';
+  // The URL says the server ended this session (account deactivated or role changed), so there is
+  // nothing to ask it. 'expired' and 'verified' are only hints and can be opened while signed in
+  // (bookmark, back button), so those still check the session and send a signed-in user away.
+  const sessionKnownEnded = reason === 'deactivated' || reason === 'role-changed';
   const session = useSession(!sessionKnownEnded);
   const login = useLogin();
   const [formError, setFormError] = useState<string | null>(null);
