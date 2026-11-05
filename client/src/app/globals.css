@@ -137,6 +137,24 @@ body {
     appearance: base-select;
   }
 
+  /* The customisable select lays its text out from the top-left of the box. Centre it vertically
+     inside the fixed-height control (the horizontal padding comes from the component). */
+  .pf-select {
+    display: flex;
+    align-items: center;
+    padding-block: 0;
+    line-height: 1.25rem;
+  }
+
+  .pf-select selectedcontent {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* The app draws its own chevron next to the select. */
   .pf-select::picker-icon {
     display: none;
