@@ -110,6 +110,7 @@ body {
   button:not(:disabled),
   [role='button']:not([aria-disabled='true']),
   select:not(:disabled),
+  select:not(:disabled) option,
   summary,
   input[type='checkbox']:not(:disabled),
   input[type='radio']:not(:disabled),
