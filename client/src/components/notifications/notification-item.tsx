@@ -75,7 +75,7 @@ export function NotificationItem({ notification, role, onOpen }: NotificationIte
       </span>
       {unread && (
         <>
-          <span aria-hidden="true" className="mt-2 size-2 shrink-0 rounded-full bg-primary" />
+          <span aria-hidden="true" className="size-2 shrink-0 self-center rounded-full bg-primary" />
           <span className="sr-only">Unread</span>
         </>
       )}
