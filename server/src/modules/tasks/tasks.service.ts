@@ -225,13 +225,11 @@ export async function updateTask(user: AuthUser, id: string, input: UpdateTaskIn
   const task = await findAccessible(user, id);
   const permissions = permissionsFor(user, task);
 
+  // Only the project's manager or an administrator may edit a task, description included.
+  // Members (even the assignee) can only change the status.
   if (!permissions.canEdit) {
     assertWritable(task);
-    throw new HttpError(403, 'You do not have permission to edit this task');
-  }
-  // Assignees (members) may only refine the description of their own tasks.
-  if (!permissions.canEditAllFields && Object.keys(input).some((key) => key !== 'description')) {
-    throw new HttpError(403, 'You can only update the description of tasks assigned to you');
+    throw new HttpError(403, 'Only the project manager or an administrator can edit a task');
   }
 
   // Keeping a due date that has already passed is fine; moving it to a past date is not.
