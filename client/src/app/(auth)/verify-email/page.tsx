@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { GuestOnly } from '@/components/auth/guest-only';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { VerifyEmailForm } from '@/components/auth/verify-email-form';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,7 +20,9 @@ export default function VerifyEmailPage() {
       }
     >
       <Suspense fallback={<Skeleton className="h-56 w-full" />}>
-        <VerifyEmailForm />
+        <GuestOnly>
+          <VerifyEmailForm />
+        </GuestOnly>
       </Suspense>
     </AuthShell>
   );

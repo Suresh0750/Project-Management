@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { GuestOnly } from '@/components/auth/guest-only';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { ForgotPasswordForm } from '@/components/auth/forgot-password-form';
 
@@ -16,7 +17,9 @@ export default function ForgotPasswordPage() {
         </Link>
       }
     >
-      <ForgotPasswordForm />
+      <GuestOnly>
+        <ForgotPasswordForm />
+      </GuestOnly>
     </AuthShell>
   );
 }
