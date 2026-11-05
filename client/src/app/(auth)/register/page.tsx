@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { GuestOnly } from '@/components/auth/guest-only';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { RegisterForm } from '@/components/auth/register-form';
 
@@ -19,7 +20,9 @@ export default function RegisterPage() {
         </>
       }
     >
-      <RegisterForm />
+      <GuestOnly>
+        <RegisterForm />
+      </GuestOnly>
     </AuthShell>
   );
 }
