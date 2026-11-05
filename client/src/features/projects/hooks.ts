@@ -14,6 +14,7 @@ import {
   listProjectActivities,
   listProjects,
   getArchiveReadiness,
+  listOpenTasks,
   getProject,
   removeProjectMember,
   setProjectArchived,
@@ -56,6 +57,17 @@ export function useArchiveReadiness(id: string, enabled: boolean) {
     queryFn: ({ signal }) => getArchiveReadiness(id, signal),
     enabled,
     // Always judge against fresh data: tasks may have changed since the dialog last opened.
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+export function useOpenTasks(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['projects', 'open-tasks', id] as const,
+    queryFn: ({ signal }) => listOpenTasks(id, signal),
+    enabled: enabled && Boolean(id),
+    // Always the current list: tasks may have changed since the dialog last opened.
     staleTime: 0,
     gcTime: 0,
   });

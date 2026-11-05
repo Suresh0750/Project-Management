@@ -1,4 +1,4 @@
-import { Role, TaskStatus, type Prisma } from '@prisma/client';
+import { ProjectStatus, Role, TaskStatus, type Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma/client.js';
 import { HttpError } from '../../utils/httpError.js';
 import type { AuthUser } from '../../types/express.js';
@@ -73,6 +73,58 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   IN_REVIEW: 'In Review',
   COMPLETED: 'Completed',
 };
+
+/**
+ * Keeps a project's status in step with its tasks (deleted tasks do not count):
+ *   every task completed (and at least one task)  ->  a Planning or Active project becomes Completed
+ *   a task that is not completed                  ->  a Completed project becomes Active again
+ * On Hold projects are left alone: that is a deliberate choice by a person. Call inside the
+ * transaction of the task change. Returns nothing; the change is recorded in the activity feed.
+ */
+async function syncProjectStatus(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  user: AuthUser,
+  outbox: Outbox,
+  task: { title: string },
+): Promise<void> {
+  const project = await tx.project.findUnique({
+    where: { id: projectId },
+    select: { name: true, status: true, archivedAt: true },
+  });
+  if (!project || project.archivedAt) return;
+
+  const live = { projectId, deletedAt: null };
+  const [total, open] = await Promise.all([
+    tx.task.count({ where: live }),
+    tx.task.count({ where: { ...live, status: { not: TaskStatus.COMPLETED } } }),
+  ]);
+
+  let next: ProjectStatus | null = null;
+  if (
+    open === 0 &&
+    total > 0 &&
+    (project.status === ProjectStatus.PLANNING || project.status === ProjectStatus.ACTIVE)
+  ) {
+    next = ProjectStatus.COMPLETED;
+  } else if (open > 0 && project.status === ProjectStatus.COMPLETED) {
+    next = ProjectStatus.ACTIVE;
+  }
+  if (!next) return;
+
+  await tx.project.update({ where: { id: projectId }, data: { status: next } });
+  await recordActivity(tx, {
+    action: 'PROJECT_UPDATED',
+    message:
+      next === ProjectStatus.COMPLETED
+        ? `Project "${project.name}" was marked Completed: all of its tasks are completed`
+        : `Project "${project.name}" is Active again: "${task.title}" is not completed`,
+    actorId: user.id,
+    projectId,
+    metadata: { fields: ['status'], status: next, automatic: true },
+  });
+  outbox.addProjectEvent(projectId, 'project:updated');
+}
 
 async function assertValidAssignee(projectId: string, assigneeId: string) {
   const membership = await prisma.projectMember.findUnique({
@@ -193,6 +245,8 @@ export async function createTask(user: AuthUser, input: CreateTaskInput) {
       projectId: project.id,
       taskId: task.id,
     });
+    // A new task that is not completed reopens a Completed project.
+    await syncProjectStatus(tx, project.id, user, outbox, { title: input.title });
 
     if (assignee) {
       await recordActivity(tx, {
@@ -314,6 +368,7 @@ export async function updateTaskStatus(user: AuthUser, id: string, input: Update
         projectId: task.projectId,
         taskId: id,
       }));
+      await syncProjectStatus(tx, task.projectId, user, outbox, task);
     }
   });
   outbox.addProjectEvent(task.projectId, 'task:statusChanged', { taskId: id });

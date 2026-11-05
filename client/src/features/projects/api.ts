@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api/client';
 import { isPaginationMeta, type ApiSuccess, type Paginated } from '@/lib/api/types';
 import type { ProjectFormValues } from '@/schemas/project';
+import type { TaskStatus } from '@/types/task';
 import type {
   ArchiveReadiness,
   PersonRef,
@@ -133,6 +134,19 @@ export async function listProjectActivities(
     { params: { page, limit: 10 }, signal },
   );
   return paginated(data);
+}
+
+export interface OpenTasks {
+  total: number;
+  tasks: Array<{ id: string; title: string; status: TaskStatus }>;
+}
+
+/** The tasks that still stop the project from being completed. */
+export async function listOpenTasks(id: string, signal?: AbortSignal): Promise<OpenTasks> {
+  const { data } = await apiClient.get<ApiSuccess<OpenTasks>>(`${projectPath(id)}/open-tasks`, {
+    signal,
+  });
+  return data.data;
 }
 
 export async function getArchiveReadiness(id: string, signal?: AbortSignal): Promise<ArchiveReadiness> {

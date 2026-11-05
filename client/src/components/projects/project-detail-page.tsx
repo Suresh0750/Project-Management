@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { ActivityPanel } from '@/components/projects/activity-panel';
 import { ArchiveProjectDialog } from '@/components/projects/archive-project-dialog';
 import { MembersPanel } from '@/components/projects/members-panel';
+import { OpenTasksDialog } from '@/components/projects/open-tasks-dialog';
 import { ProjectTasksPanel } from '@/components/projects/project-tasks-panel';
 import { PriorityBadge, ProjectStatusBadge } from '@/components/projects/project-badges';
 import { ProjectForm } from '@/components/projects/project-form';
@@ -27,6 +28,7 @@ import {
   useProject,
   useUpdateProject,
 } from '@/features/projects/hooks';
+import { ApiError } from '@/lib/api/errors';
 import { ROLE_BASE_PATH } from '@/lib/auth/navigation';
 import type { ProjectFormValues } from '@/schemas/project';
 import type { Role } from '@/types/auth';
@@ -107,6 +109,7 @@ export function ProjectDetailPage({ role }: { role: Role }) {
 
   const [tab, setTab] = useState<TabId>('overview');
   const [editing, setEditing] = useState(false);
+  const [showOpenTasks, setShowOpenTasks] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
 
   const base = ROLE_BASE_PATH[role];
@@ -158,7 +161,15 @@ export function ProjectDetailPage({ role }: { role: Role }) {
       payload.managerId = full.managerId;
     }
 
-    await updateProject.mutateAsync(payload);
+    try {
+      await updateProject.mutateAsync(payload);
+    } catch (error) {
+      // Some tasks are still open: besides the message under the Status field, list them.
+      if (error instanceof ApiError && error.fieldErrors.code === 'PROJECT_HAS_OPEN_TASKS') {
+        setShowOpenTasks(true);
+      }
+      throw error;
+    }
     toast.success('Project updated');
     setEditing(false);
   };
@@ -186,7 +197,7 @@ export function ProjectDetailPage({ role }: { role: Role }) {
 
   const actions = data.canManage ? (
     <>
-      {!archived && (
+      {!archived && tab === 'overview' && (
         <Button variant="secondary" onClick={() => setEditing((current) => !current)}>
           <Pencil className="size-4" aria-hidden="true" />
           {editing ? 'Cancel edit' : 'Edit'}
@@ -226,6 +237,18 @@ export function ProjectDetailPage({ role }: { role: Role }) {
           </Alert>
         </div>
       )}
+
+      <OpenTasksDialog
+        open={showOpenTasks}
+        projectId={id}
+        tasksPath={`${base}/tasks`}
+        onClose={() => setShowOpenTasks(false)}
+        onGoToTasks={() => {
+          setShowOpenTasks(false);
+          setEditing(false);
+          setTab('tasks');
+        }}
+      />
 
       <Tabs items={TABS} value={tab} onChange={setTab} label="Project sections" idPrefix="project" />
 

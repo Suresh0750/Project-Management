@@ -17,6 +17,8 @@ import {
 
 const PERSON_SELECT = { id: true, name: true, email: true } as const;
 const DEADLINE_MESSAGE = 'Deadline cannot be earlier than the start date';
+// Marker the page looks for to show the list of open tasks.
+const OPEN_TASKS_CODE = 'PROJECT_HAS_OPEN_TASKS';
 
 const projectInclude = {
   manager: { select: PERSON_SELECT },
@@ -228,6 +230,21 @@ export async function updateProject(user: AuthUser, id: string, input: UpdatePro
     await assertValidManager(input.managerId);
   }
 
+  // A project can only be set to Completed when all of its tasks are completed. Tasks that were
+  // deleted do not count. The same rule is shown to the person as a list of the open tasks.
+  if (input.status === ProjectStatus.COMPLETED && project.status !== ProjectStatus.COMPLETED) {
+    const open = await prisma.task.count({
+      where: { projectId: id, deletedAt: null, status: { not: TaskStatus.COMPLETED } },
+    });
+    if (open > 0) {
+      const message = `This project cannot be completed yet: ${plural(open, 'task is', 'tasks are')} not completed.`;
+      throw new HttpError(409, message, [
+        { path: 'status', message },
+        { path: 'code', message: OPEN_TASKS_CODE },
+      ]);
+    }
+  }
+
   // Dates may be updated one at a time, so validate the merged result.
   const merged = {
     startDate: input.startDate !== undefined ? input.startDate : project.startDate,
@@ -349,6 +366,22 @@ async function computeArchiveReadiness(project: ProjectRow) {
       memberCount,
     },
   };
+}
+
+/** The tasks that still stop a project from being completed (deleted tasks are not included). */
+export async function listOpenTasks(user: AuthUser, id: string) {
+  await findManageable(user, id);
+  const where = { projectId: id, deletedAt: null, status: { not: TaskStatus.COMPLETED } };
+  const [total, tasks] = await prisma.$transaction([
+    prisma.task.count({ where }),
+    prisma.task.findMany({
+      where,
+      orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+      take: 20,
+      select: { id: true, title: true, status: true },
+    }),
+  ]);
+  return { total, tasks };
 }
 
 export async function getArchiveReadiness(user: AuthUser, id: string) {
