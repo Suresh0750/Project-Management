@@ -11,10 +11,6 @@ export interface ApiErrorBody {
   errors: unknown[];
 }
 
-export interface HealthPayload {
-  status: string;
-  service: string;
-}
 
 export interface PaginationMeta {
   total: number;

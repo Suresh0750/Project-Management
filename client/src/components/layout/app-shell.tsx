@@ -9,7 +9,7 @@ import { MobileSidebar } from '@/components/layout/mobile-sidebar';
 import { ProfileMenu } from '@/components/layout/profile-menu';
 import { useLogout } from '@/features/auth/hooks';
 import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed';
-import { broadcastLogout, onLogoutElsewhere } from '@/lib/auth/session-sync';
+import { broadcastLogout, onLoginElsewhere, onLogoutElsewhere } from '@/lib/auth/session-sync';
 import { disconnectSocket } from '@/lib/socket/client';
 import { useRealtime } from '@/lib/socket/use-realtime';
 import type { AuthUser } from '@/types/auth';
@@ -33,6 +33,10 @@ export function AppShell({ user, children }: { user: AuthUser; children: ReactNo
       }),
     [],
   );
+
+  // Signed in (possibly as another person) in another tab: the cookies changed under this tab.
+  // Reload, so the route guard and the session check show the right user and area.
+  useEffect(() => onLoginElsewhere(() => window.location.reload()), []);
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 

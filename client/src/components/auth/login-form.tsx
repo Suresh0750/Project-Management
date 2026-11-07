@@ -11,6 +11,7 @@ import { PasswordField } from '@/components/ui/password-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
 import { startCountdownIfIdle } from '@/hooks/use-countdown';
+import { useLeaveOnLoginElsewhere } from '@/hooks/use-login-elsewhere';
 import { useLogin, useSession } from '@/features/auth/hooks';
 import { loginSchema, type LoginValues } from '@/schemas/auth';
 import { resolvePostLoginPath } from '@/utils/role-routes';
@@ -37,6 +38,7 @@ export function LoginForm() {
   // (bookmark, back button), so those still check the session and send a signed-in user away.
   const sessionKnownEnded = reason === 'deactivated' || reason === 'role-changed';
   const session = useSession(!sessionKnownEnded);
+  useLeaveOnLoginElsewhere();
   const login = useLogin();
   const [formError, setFormError] = useState<string | null>(null);
 
