@@ -1,5 +1,6 @@
 'use client';
 
+import { broadcastLogin } from '@/lib/auth/session-sync';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   changePassword,
@@ -39,6 +40,7 @@ export function useLogin() {
     mutationFn: (values) => login(values),
     onSuccess: (user) => {
       queryClient.setQueryData(SESSION_QUERY_KEY, user);
+      broadcastLogin();
     },
   });
 }
@@ -94,7 +96,10 @@ export function useVerifyEmail() {
   const queryClient = useQueryClient();
   return useMutation<AuthUser, ApiError, { email: string; otp: string }>({
     mutationFn: verifyEmail,
-    onSuccess: (user) => queryClient.setQueryData(SESSION_QUERY_KEY, user),
+    onSuccess: (user) => {
+      queryClient.setQueryData(SESSION_QUERY_KEY, user);
+      broadcastLogin(); // verifying the code also signs the user in
+    },
   });
 }
 
